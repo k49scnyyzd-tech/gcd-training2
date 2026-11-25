@@ -1,10 +1,2285 @@
-// ==================== ③ 管理者画面 ====================
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ed780c">
+  <meta name="robots" content="noindex, nofollow">
+  <title>GOOD CREW DINING | OFF研修日程調整 ＆ TR管理システム</title>
+  <meta property="og:title" content="GOOD CREW DINING | OFF研修日程調整 ＆ TR管理">
+  <meta property="og:description" content="新人OFF研修の予約・トレーナー日程提出はこちらから行えます。">
+  <meta property="og:type" content="website">
+  <!-- ==================== EXTERNAL LIBRARIES ==================== -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    /* ==================== CSS: BASE & LAYOUT ==================== */
+    :root {
+      --orange: #ed780c;
+      --orange-dark: #c96100;
+      --primary: #06c755;
+      --primary-dark: #05b34c;
+      --highlight: #2563eb;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --dark: #32291f;
+      --muted: #6e655b;
+      --line: #eee7df;
+      --border: #e2e8f0;
+      --bg: #faf8f5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--dark);
+      font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button:focus-visible,
+    a:focus-visible {
+      outline: 3px solid #ecaa68;
+      outline-offset: 2px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="month"],
+    input[type="search"],
+    input[type="url"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid #ded7ce;
+      border-radius: 9px;
+      background: #ffffff;
+      color: var(--dark);
+    }
+
+    textarea {
+      min-height: 76px;
+      resize: vertical;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      margin: 12px 0 5px;
+      color: #4a3f35;
+    }
+
+    header {
+      min-height: 74px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 5vw;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ed780c, #f59e0b);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 16px;
+      color: var(--dark);
+    }
+
+    .brand small {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      display: block;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .user-pill {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9b5d20;
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .sync-pill {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .layout {
+      max-width: 1280px;
+      margin: auto;
+      display: grid;
+      grid-template-columns: 225px 1fr;
+      min-height: calc(100vh - 74px);
+    }
+
+    aside {
+      padding: 28px 18px;
+      border-right: 1px solid var(--line);
+      background: #fcfaf7;
+    }
+
+    .nav-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav button {
+      border: 0;
+      text-align: left;
+      background: transparent;
+      padding: 13px 14px;
+      border-radius: 10px;
+      color: #6e655b;
+      font-weight: 700;
+      transition: all 0.15s;
+    }
+
+    .nav button:hover {
+      background: #f5efe8;
+    }
+
+    .nav button.active {
+      color: var(--orange-dark);
+      background: #fff0df;
+    }
+
+    .nav button span {
+      display: inline-block;
+      width: 24px;
+    }
+
+    main {
+      padding: 30px 36px 60px;
+    }
+
+    h1 {
+      font-size: 24px;
+      line-height: 1.4;
+      margin: 4px 0;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin: 0;
+    }
+
+    h3 {
+      font-size: 14px;
+      margin: 14px 0 8px;
+    }
+
+    p {
+      margin: 8px 0;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ==================== CSS: COMPONENTS ==================== */
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .month-control {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .month-control button {
+      border: 0;
+      background: transparent;
+      width: 28px;
+      height: 28px;
+      color: var(--muted);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .month-control strong {
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 310px;
+      gap: 20px;
+    }
+
+    .panel {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(50, 41, 31, 0.02);
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .count {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .welcome-card {
+      background: linear-gradient(135deg, #fff7ed 0%, #fffbf6 100%);
+      border: 1px solid #fed7aa;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .venue-box {
+      background: #ffffff;
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      padding: 13px 15px;
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .map-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 7px 13px;
+      background: #fff0df;
+      color: #c96100;
+      border: 1px solid #f3bc86;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .map-link-btn:hover {
+      background: #ffe4c4;
+    }
+
+    .save-success-banner {
+      background: #dcfce7;
+      border: 1.5px solid #22c55e;
+      color: #14532d;
+      padding: 13px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      animation: fadeSlideIn 0.25s ease-out;
+    }
+
+    @keyframes fadeSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .notice {
+      padding: 13px 15px;
+      background: #fff7ed;
+      border: 1px solid #ffedd5;
+      border-radius: 10px;
+      font-size: 12px;
+      margin: 14px 0;
+    }
+
+    .error {
+      color: #b3392c;
+      background: #fff0ed;
+      border: 1px solid #fecaca;
+      padding: 12px 14px;
+      border-radius: 9px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .deadline-banner {
+      background: #fff0df;
+      border: 1px solid #fed7aa;
+      color: #9b5d20;
+      padding: 10px 14px;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 700;
+      margin: 12px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .deadline-banner.expired {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #b91c1c;
+    }
+
+    /* 候補日カード */
+    .slot {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+      background: #ffffff;
+    }
+
+    .slot.confirmed {
+      border-color: #efab6a;
+      background: #fffaf5;
+    }
+
+    .date-block {
+      background: #fff5e9;
+      color: #c96600;
+      border-radius: 10px;
+      min-width: 64px;
+      text-align: center;
+      padding: 8px 6px;
+    }
+
+    .date-block b {
+      display: block;
+      font-size: 24px;
+      line-height: 1.25;
+    }
+
+    .date-block small {
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .slot-info {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .slot-info strong {
+      font-size: 15px;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .pill {
+      font-size: 11px;
+      background: #edf7ef;
+      color: #2f6f40;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-left: 6px;
+      display: inline-block;
+      font-weight: 700;
+    }
+
+    .tag {
+      background: #e2e8f0;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-block;
+    }
+
+    .tag-kanayama {
+      background: #dfeefd;
+      color: #1e40af;
+    }
+
+    .tag-sakae {
+      background: #fce7f3;
+      color: #9d174d;
+    }
+
+    .tag-meieki {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .tag-sakurayama {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .tag-imaike {
+      background: #e0e7ff;
+      color: #3730a3;
+    }
+
+    .tag-fushimi {
+      background: #f3e8ff;
+      color: #6b21a8;
+    }
+
+    .tag-nishiki {
+      background: #ffe4e6;
+      color: #9f1239;
+    }
+
+    .tag-veteran {
+      background: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+
+    .tag-beginner {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .tag-owner {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    /* ボタン */
+    .btn {
+      border: 0;
+      background: var(--orange);
+      color: #ffffff;
+      border-radius: 9px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover {
+      opacity: 0.92;
+    }
+
+    .btn.green {
+      background: var(--primary);
+    }
+
+    .btn.secondary {
+      background: #ffffff;
+      color: #645a4f;
+      border: 1px solid #ded7ce;
+    }
+
+    .btn.danger {
+      color: #b94b3b;
+      background: #fff2ef;
+      border: 1px solid #fecaca;
+    }
+
+    .btn.full {
+      width: 100%;
+      margin-top: 16px;
+      padding: 12px;
+    }
+
+    .text-link {
+      border: 0;
+      background: transparent;
+      color: #be650f;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: underline;
+      padding: 5px;
+    }
+
+    .small-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .slot-actions {
+      justify-content: flex-end;
+      margin: 8px 0 16px;
+    }
+
+    /* 管理者ダッシュボード：大判タップ可能タイル ＆ クイックリンク */
+    .dashboard-tiles {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .dash-tile {
+      background: #ffffff;
+      border: 1.5px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 18px 16px;
+      text-align: left;
+      color: var(--dark);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 118px;
+      box-shadow: 0 2px 8px rgba(50, 41, 31, 0.03);
+      transition: transform 0.12s, border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .dash-tile:hover {
+      border-color: var(--orange);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(237, 120, 12, 0.12);
+    }
+
+    .dash-tile:active {
+      transform: scale(0.99);
+    }
+
+    .dash-tile-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #4a3f35;
+    }
+
+    .dash-tile-num {
+      font-size: 30px;
+      font-weight: 900;
+      line-height: 1.2;
+      margin: 8px 0 6px;
+    }
+
+    .dash-tile-foot {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--orange-dark);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .dash-tile.alert-tile {
+      border-color: #fecaca;
+      background: #fffafa;
+    }
+
+    .dash-tile.ok-tile {
+      border-color: #bbf7d0;
+      background: #f8fffb;
+    }
+
+    .quick-link-bar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .quick-link-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px 10px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 11px;
+      color: #9b5d20;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      text-align: center;
+      transition: background 0.15s;
+    }
+
+    .quick-link-btn:hover {
+      background: #ffedd5;
+    }
+
+    /* カレンダーグリッド */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .cal-header {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 4px 0;
+    }
+
+    .cal-day {
+      padding: 8px 2px;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      font-size: 14px;
+      font-weight: 700;
+      background: #ffffff;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 58px;
+      justify-content: space-between;
+      transition: all 0.12s;
+    }
+
+    .cal-day:hover:not(.disabled) {
+      border-color: var(--primary);
+    }
+
+    .cal-day.selected {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary-dark);
+    }
+
+    .cal-day.disabled {
+      background: #f1f5f9;
+      color: #94a3b8;
+      cursor: not-allowed;
+      border-color: #e2e8f0;
+    }
+
+    .time-badge {
+      font-size: 10px;
+      font-weight: 700;
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 2px 5px;
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+
+    .cal-day.selected .time-badge {
+      background: rgba(255, 255, 255, 0.92);
+      color: #047857;
+    }
+
+    .admin-cal-day {
+      padding: 6px 4px;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: #ffffff;
+      cursor: pointer;
+      min-height: 64px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .admin-cal-day:hover {
+      border-color: var(--highlight);
+    }
+
+    .admin-cal-day.active-day {
+      border: 2px solid var(--highlight);
+      background: #eff6ff;
+    }
+
+    .day-number {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .badge-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 2px;
+    }
+
+    .work-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 3px;
+      border-radius: 4px;
+      background: #f1f5f9;
+      color: #64748b;
+    }
+
+    .work-badge.has-workers {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .work-badge.has-slots {
+      background: #fff0df;
+      color: #c96100;
+    }
+
+    /* サマリー・タブ・テーブル */
+    .tabs {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin: 18px 0;
+    }
+
+    .tabs button {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 9px 14px;
+      background: #ffffff;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .tabs button.active {
+      background: #fff0df;
+      color: #be6000;
+      border-color: #f3bc86;
+    }
+
+    .half-tabs {
+      margin-top: 0;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      border: 1px solid var(--border);
+      background: #ffffff;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .filter-btn.active {
+      background: var(--dark);
+      color: #ffffff;
+      border-color: var(--dark);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 700;
+      background: #fcfaf7;
+    }
+
+    td,
+    th {
+      padding: 11px 8px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .empty {
+      padding: 32px 15px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .welcome {
+      font-size: 36px;
+      margin: 6px 0;
+      color: var(--primary);
+      font-weight: 900;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .check input {
+      width: auto;
+    }
+
+    .message-body {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 4px 10px;
+      margin: 8px 0 0;
+      font-size: 12px;
+    }
+
+    dt {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    dd {
+      margin: 0;
+    }
+
+    /* ダイアログ・トースト */
+    dialog {
+      border: 0;
+      border-radius: 16px;
+      padding: 24px;
+      width: min(500px, 94vw);
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(50, 41, 31, 0.25);
+    }
+
+    dialog::backdrop {
+      background: rgba(51, 38, 25, 0.45);
+    }
+
+    dialog h2 {
+      margin-bottom: 12px;
+    }
+
+    .wide-dialog {
+      width: min(760px, 96vw);
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #14532d;
+      color: #ffffff;
+      border: 2px solid #22c55e;
+      padding: 14px 24px;
+      border-radius: 12px;
+      z-index: 9999;
+      font-size: 14px;
+      font-weight: 700;
+      max-width: 92vw;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+    }
+
+    @media (max-width: 960px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .layout {
+        grid-template-columns: 180px 1fr;
+      }
+
+      main {
+        padding: 22px 18px;
+      }
+
+      .dashboard-tiles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .quick-link-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 650px) {
+      header {
+        padding: 10px 14px;
+      }
+
+      .layout {
+        display: block;
+      }
+
+      aside {
+        padding: 10px 14px;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .nav {
+        flex-direction: row;
+      }
+
+      .nav button {
+        flex: 1;
+        font-size: 12px;
+        text-align: center;
+        padding: 10px 4px;
+      }
+
+      .nav-label {
+        display: none;
+      }
+
+      main {
+        padding: 14px 14px 50px;
+      }
+
+      .slot {
+        flex-wrap: wrap;
+      }
+
+      .slot .btn {
+        width: 100%;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard-tiles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .dash-tile {
+        padding: 14px 12px;
+        min-height: 106px;
+      }
+
+      .dash-tile-num {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ==================== HTML STRUCTURE ==================== -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">GCD</div>
+      <div>
+        <strong>OFF研修日程調整 ＆ TR管理</strong>
+        <small>GOOD CREW DINING</small>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="header-user-badge" class="user-pill">読込中...</span>
+      <span id="live-sync-badge" class="sync-pill">同期確認中...</span>
+      <button id="reload-data" class="text-link">最新情報に更新</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <div class="nav-label">MENU</div>
+      <nav class="nav">
+        <button data-role="newcomer" class="active"><span>◷</span>① 新人研修予約</button>
+        <button data-role="trainer"><span>▤</span>🔒 ② TR日程提出</button>
+        <button data-role="admin"><span>⚙</span>🔒 ③ 管理画面</button>
+      </nav>
+    </aside>
+
+    <main id="main">
+      <div class="empty">システムを起動しています...</div>
+    </main>
+  </div>
+
+  <!-- 汎用モーダルダイアログ -->
+  <dialog id="dialog"></dialog>
+
+  <!-- TR時間帯指定モーダルダイアログ（各種設定の開始時間と連動） -->
+  <dialog id="timeSelectModal">
+    <h2 id="modalDateTitle">対応可能時間帯の指定</h2>
+    <p class="hint">特定の開始時間のみ対応可能な場合はチェックを入れてください。<br>チェックなしで「確定」すると<strong>終日可（有効な全時間帯対応可）</strong>になります。</p>
+    <div id="modal-time-options" style="margin: 14px 0;"></div>
+    <div style="display:flex; justify-content:space-between; gap:8px; margin-top:18px;">
+      <button type="button" class="btn danger" id="btn-remove-date">この日の選択を解除</button>
+      <div class="small-actions">
+        <button type="button" class="btn secondary" id="btn-close-time-modal">閉じる</button>
+        <button type="button" class="btn green" id="btn-confirm-time-modal">確定する</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" hidden role="status"></div>
+
+  <script>
+    // ==================== JS: STATE & CONFIG ====================
+    const IS_DEV_MODE = false;
+    const MY_LIFF_ID = "2012530587-COmH7suN";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxEoCedNQLuD-qz5z4aFZ6trSwBQcLPXxnLU-496Gq6-InRoqaFEsfpIonw6c09Jk4X/exec";
+    const VENUE_MAP_URL = "https://x.gd/FFibO";
+    const DEFAULT_ADMIN_PIN = "123123";
+    const DEFAULT_TRAINER_PIN = "123123";
+    const STORAGE_KEY = "gcd_merged_training_state_v2";
+
+    const DEFAULT_AREAS = ["金山", "名駅", "栄", "桜山", "今池", "伏見", "錦"];
+
+    const DEFAULT_STORES_LIST = [
+      // 金山エリア
+      {id: "st-1", area: "金山", name: "くずし割烹 肴屋八兵衛", active: true, deletedAt: null},
+      {id: "st-2", area: "金山", name: "博多串焼きと刺身 ココロザシ", active: true, deletedAt: null},
+      {id: "st-3", area: "金山", name: "博多串焼きと刺身 ココロザシ 金山南口店", active: true, deletedAt: null},
+      {id: "st-4", area: "金山", name: "モツ焼き 刺身 肉ドウフ ナミヨセ2117", active: true, deletedAt: null},
+      {id: "st-5", area: "金山", name: "炉端焼き燻銀 金山店", active: true, deletedAt: null},
+      {id: "st-6", area: "金山", name: "炉端焼き燻銀 波寄町店", active: true, deletedAt: null},
+      {id: "st-7", area: "金山", name: "サカナのハチベエ 金山店", active: true, deletedAt: null},
+      {id: "st-8", area: "金山", name: "囲炉裏家さんかい", active: true, deletedAt: null},
+      {id: "st-9", area: "金山", name: "ぐっとスペース 金山店", active: true, deletedAt: null},
+      {id: "st-10", area: "金山", name: "ビアガーデン＆BBQ 空にわテラス金山", active: true, deletedAt: null},
+      {id: "st-11", area: "金山", name: "ぐっとくるダイニング セントラルキッチン", active: true, deletedAt: null},
+      // 名駅エリア
+      {id: "st-12", area: "名駅", name: "大衆割烹 八べゑ", active: true, deletedAt: null},
+      {id: "st-13", area: "名駅", name: "炉端焼き 燻銀 名駅西口店", active: true, deletedAt: null},
+      {id: "st-14", area: "名駅", name: "炉端焼き 燻銀 名駅三丁目店", active: true, deletedAt: null},
+      {id: "st-15", area: "名駅", name: "サカナのハチベエ 名駅四丁目店", active: true, deletedAt: null},
+      {id: "st-16", area: "名駅", name: "名駅西口 鮨食人 五と二", active: true, deletedAt: null},
+      {id: "st-17", area: "名駅", name: "博多串焼と刺身 ココロザシ 名駅西口店", active: true, deletedAt: null},
+      {id: "st-18", area: "名駅", name: "囲炉裏家さんかい 名駅西口店", active: true, deletedAt: null},
+      // 栄エリア
+      {id: "st-19", area: "栄", name: "サカナのハチベエ 栄三丁目店", active: true, deletedAt: null},
+      {id: "st-20", area: "栄", name: "サカナのハチベエ 矢場町店", active: true, deletedAt: null},
+      {id: "st-21", area: "栄", name: "炉端焼き 燻銀 栄店", active: true, deletedAt: null},
+      {id: "st-22", area: "栄", name: "鮨食人 五と二 栄", active: true, deletedAt: null},
+      {id: "st-23", area: "栄", name: "矢場町 鮨食人 五と二", active: true, deletedAt: null},
+      // 桜山エリア
+      {id: "st-24", area: "桜山", name: "桜山鮨食人 五と二", active: true, deletedAt: null},
+      // 今池エリア
+      {id: "st-25", area: "今池", name: "サカナのハチベエ 今池店", active: true, deletedAt: null},
+      // 伏見エリア
+      {id: "st-26", area: "伏見", name: "炉端焼き 燻銀 伏見店", active: true, deletedAt: null},
+      // 錦エリア
+      {id: "st-27", area: "錦", name: "大衆割烹 八べゑ 錦3丁目店", active: true, deletedAt: null}
+    ];
+
+    const $ = s => document.querySelector(s);
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+
+    const today = () => new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(new Date());
+
+    const nowTimeStr = () => new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).format(new Date());
+
+    const monthLabel = m => `${Number(m.slice(0, 4))}年${Number(m.slice(5))}月`;
+    const fmt = d => new Date(d + "T00:00:00+09:00").toLocaleDateString("ja-JP", {
+      month: "long", day: "numeric", weekday: "short", timeZone: "Asia/Tokyo"
+    });
+
+    function addMonths(ym, delta) {
+      const d = new Date(ym + "-01T12:00:00Z");
+      d.setUTCMonth(d.getUTCMonth() + delta);
+      return d.toISOString().slice(0, 7);
+    }
+
+    function trainingEnd(t) {
+      const [h, m] = t.split(":").map(Number);
+      return String(h + 4).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+    }
+
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function getAvailableAreas() {
+      const stores = (AppState.state?.stores || []).filter(st => !st.deletedAt && st.active && st.area);
+      const fromStores = stores.map(st => st.area);
+      return Array.from(new Set([...DEFAULT_AREAS, ...fromStores]));
+    }
+
+    function getStoresByArea(area, includeStoreName = "") {
+      const activeStores = (AppState.state?.stores || []).filter(
+        st => !st.deletedAt && st.active && st.area === area
+      );
+      const names = activeStores.map(st => st.name);
+      if (includeStoreName && !names.includes(includeStoreName)) {
+        names.unshift(includeStoreName);
+      }
+      return names;
+    }
+
+    function normalizeStoresCatalog(stateObj) {
+      if (!stateObj) return;
+      const existing = stateObj.stores || [];
+      const isLegacyOnly = existing.length === 0 || existing.every(s => !s.area && ["金山", "栄", "名駅"].includes(s.name));
+      if (isLegacyOnly) {
+        stateObj.stores = JSON.parse(JSON.stringify(DEFAULT_STORES_LIST));
+      } else {
+        stateObj.stores.forEach(st => {
+          if (!st.area) st.area = "金山";
+        });
+      }
+    }
+
+    function operatingDefaults() {
+      return {
+        firstDeadlineDay: 20,   // 1～15日分：前月20日まで
+        secondDeadlineDay: 8,   // 16日～月末分：当月8日まで
+        starts: ["17:00", "17:30", "18:00", "18:30"],
+        location: "ココロザシ金山店 ４階 研修会議室",
+        bookingDeadline: "17:00",
+        bookingDaysBefore: 0,
+        targetDays: 7,
+        minVeterans: 1,
+        requireLineWorksId: false,
+        requireUniformSize: true,
+        uniformSizes: ["S", "M", "L", "XL", "3L"],
+        notifyBooking: true,
+        notifyChanges: true,
+        intakeMode: "dates_first",
+        remindersEnabled: true,
+        reminderDaysBefore: 3,
+        reminderHour: 9,
+        submissionMailEnabled: true,
+        submissionMailHour: 9,
+        submissionMailRetryDays: 2,
+        swapEscalationHours: 24,
+        enforceDeadline: true,
+        isLocked: false
+      };
+    }
+
+    function submissionDeadline(month, half, c = operatingOf()) {
+      const d = new Date(month + "-01T00:00:00Z");
+      if (half === 1) d.setUTCMonth(d.getUTCMonth() - 1);
+      const day = half === 1 ? Number(c.firstDeadlineDay || 20) : Number(c.secondDeadlineDay || 8);
+      return d.toISOString().slice(0, 7) + "-" + String(day).padStart(2, "0");
+    }
+
+    function isSubmissionPeriodExpired(month, half, c = operatingOf()) {
+      if (c.enforceDeadline === false) return false;
+      const dlDate = submissionDeadline(month, half, c);
+      const cutoffTs = new Date(dlDate + "T23:59:59+09:00").getTime();
+      return Date.now() > cutoffTs;
+    }
+
+    function detectNextOpenPeriod(c = operatingOf()) {
+      let ym = today().slice(0, 7);
+      let half = 1;
+      for (let i = 0; i < 8; i++) {
+        if (!isSubmissionPeriodExpired(ym, half, c)) {
+          return {month: ym, half};
+        }
+        if (half === 1) {
+          half = 2;
+        } else {
+          ym = addMonths(ym, 1);
+          half = 1;
+        }
+      }
+      return {month: ym, half};
+    }
+
+    function createInitialState() {
+      return {
+        config: {
+          email: "manager@goodcrewdining.example.com",
+          adminPin: DEFAULT_ADMIN_PIN,
+          trainerPin: DEFAULT_TRAINER_PIN,
+          operating: operatingDefaults(),
+          operatingRevision: 1,
+          newcomerProfileEnabled: true,
+          sharedRoster: {enabled: true, url: "https://docs.google.com/spreadsheets/", pending: 0, failed: 0, lastSuccessAt: new Date().toISOString()},
+          cleanup: {enabled: true, intervalMonths: 1, pending: false, lastCheckedAt: "", lastCompletedAt: ""}
+        },
+        stores: JSON.parse(JSON.stringify(DEFAULT_STORES_LIST)),
+        people: [],
+        availability: [],
+        slots: [],
+        bookings: [],
+        cancelledBookings: [],
+        requests: [],
+        swaps: [],
+        events: [
+          {id: "ev-1", at: new Date().toISOString(), message: "システムを初期化しました"}
+        ],
+        messages: []
+      };
+    }
+
+    const initialOpen = detectNextOpenPeriod(operatingDefaults());
+
+    const AppState = {
+      month: today().slice(0, 7),
+      role: "newcomer",
+      tab: "bookings",
+      workflowHalf: initialOpen.half,
+      selectedAdminDate: today(),
+      areaFilter: "すべて",
+      staffKind: "all",
+      staffSearch: "",
+      showDeletedStaff: false,
+      showDeletedStores: false,
+      selectedStaff: new Set(),
+      trainingHistory: false,
+      isTrainerPinVerified: false,
+      isAdminPinVerified: false,
+      busy: false,
+      currentUserId: "",
+      lineDisplayName: "",
+      isInitialAuthChecking: true,
+      newcomerSaveFeedback: "",
+      trSaveFeedback: "",
+      draftCalendarMap: {},
+      pendingModalDate: null,
+      state: null
+    };
+
+    // ==================== JS: CORE LOGIC & AUTO-MATCHING ENGINE ====================
+    function isTrainerPerson(p) {
+      return !!p && (p.role === "trainer" || (p.role === "admin" && p.trainerEnabled === true));
+    }
+
+    function isAdminPerson(p) {
+      return !!p && (p.isOwner === true || p.isSuperAdmin === true || p.isAdmin === true || p.role === "admin");
+    }
+
+    function isOwnerUser(p = getCurrentPerson()) {
+      if (!p) return false;
+      if (p.isOwner === true || p.isSuperAdmin === true) return true;
+      const hasAnyOwner = (AppState.state?.people || []).some(x => (x.isOwner === true || x.isSuperAdmin === true) && !x.deletedAt);
+      if (!hasAnyOwner && (p.isAdmin || p.role === "admin")) return true;
+      return false;
+    }
+
+    function operatingOf(s = AppState.state) {
+      return {...operatingDefaults(), ...(s?.config?.operating || {})};
+    }
+
+    function personName(id) {
+      return AppState.state.people.find(p => p.id === id)?.name || "未登録スタッフ";
+    }
+
+    function getAreaClass(area) {
+      const map = {
+        "金山": "kanayama",
+        "栄": "sakae",
+        "名駅": "meieki",
+        "桜山": "sakurayama",
+        "今池": "imaike",
+        "伏見": "fushimi",
+        "錦": "nishiki"
+      };
+      return map[area] || "";
+    }
+
+    function bookingCutoff(slot, c) {
+      const d = new Date(slot.date + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() - c.bookingDaysBefore);
+      return Math.min(
+        new Date(d.toISOString().slice(0, 10) + "T" + c.bookingDeadline + ":00+09:00").getTime(),
+        new Date(slot.date + "T" + slot.start + ":00+09:00").getTime()
+      );
+    }
+
+    function overlaps(a, b) {
+      return a.date === b.date && a.start < b.end && b.start < a.end;
+    }
+
+    function isSlotEligible(slot, now = Date.now()) {
+      const s = AppState.state;
+      const c = operatingOf(s);
+      if (!slot || slot.cancelled || slot.deletedAt) return false;
+      if (!c.starts.includes(slot.start)) return false;
+      if (new Set(slot.trainerIds).size !== 2) return false;
+      if (now > bookingCutoff(slot, c)) return false;
+      const ts = slot.trainerIds.map(id => s.people.find(p => p.id === id && p.active && !p.deletedAt && isTrainerPerson(p)));
+      if (ts.some(t => !t)) return false;
+      if (ts.filter(t => t.experience === "veteran").length < c.minVeterans) return false;
+      return !s.slots.some(other =>
+        other.id !== slot.id &&
+        !other.cancelled &&
+        !other.deletedAt &&
+        overlaps(slot, other) &&
+        s.bookings.some(b => b.slotId === other.id) &&
+        (slot.location === other.location || slot.trainerIds.some(id => other.trainerIds.includes(id)))
+      );
+    }
+
+    function rebuildAutoSlots() {
+      const s = AppState.state;
+      const c = operatingOf(s);
+      const activeTrainers = s.people.filter(p => isTrainerPerson(p) && p.active && !p.deletedAt);
+
+      const lockedSlotKeys = new Set();
+      const busyTrainersByDateTime = new Map();
+
+      s.slots.forEach(slot => {
+        const hasBooking = s.bookings.some(b => b.slotId === slot.id);
+        if (hasBooking || slot.manual) {
+          const key = `${slot.date}|${slot.start}`;
+          lockedSlotKeys.add(key);
+          if (!busyTrainersByDateTime.has(key)) busyTrainersByDateTime.set(key, new Set());
+          slot.trainerIds.forEach(tid => busyTrainersByDateTime.get(key).add(tid));
+        }
+      });
+
+      s.slots = s.slots.filter(slot => s.bookings.some(b => b.slotId === slot.id) || slot.manual);
+
+      const dateTimeMap = new Map();
+      (s.availability || []).forEach(av => {
+        const trainer = activeTrainers.find(t => t.id === av.personId);
+        if (!trainer) return;
+        (av.entries || []).forEach(ent => {
+          const validStarts = ent.isAllDay ? [...c.starts] : (ent.starts || []);
+          validStarts.forEach(startTime => {
+            if (!c.starts.includes(startTime)) return;
+            const key = `${ent.date}|${startTime}`;
+            if (busyTrainersByDateTime.get(key)?.has(trainer.id)) return;
+            if (!dateTimeMap.has(key)) dateTimeMap.set(key, new Set());
+            dateTimeMap.get(key).add(trainer.id);
+          });
+        });
+      });
+
+      dateTimeMap.forEach((trainerIdSet, key) => {
+        if (lockedSlotKeys.has(key)) return;
+        const [date, start] = key.split("|");
+        const ids = Array.from(trainerIdSet);
+        if (ids.length < 2) return;
+
+        const minVet = Math.max(1, Number(c.minVeterans || 1));
+
+        const shuffledVeterans = shuffleArray(
+          ids.filter(id => activeTrainers.find(t => t.id === id)?.experience === "veteran")
+        );
+        const shuffledBeginners = shuffleArray(
+          ids.filter(id => activeTrainers.find(t => t.id === id)?.experience !== "veteran")
+        );
+
+        let slotIndex = 0;
+        while (shuffledVeterans.length >= minVet && (shuffledVeterans.length + shuffledBeginners.length) >= 2) {
+          const picked = [];
+          for (let v = 0; v < minVet; v++) {
+            picked.push(shuffledVeterans.shift());
+          }
+          const remainingPool = shuffleArray([...shuffledVeterans, ...shuffledBeginners]);
+          while (picked.length < 2 && remainingPool.length > 0) {
+            const chosenId = remainingPool.shift();
+            picked.push(chosenId);
+            const vIdx = shuffledVeterans.indexOf(chosenId);
+            if (vIdx >= 0) shuffledVeterans.splice(vIdx, 1);
+            const bIdx = shuffledBeginners.indexOf(chosenId);
+            if (bIdx >= 0) shuffledBeginners.splice(bIdx, 1);
+          }
+
+          if (picked.length === 2) {
+            slotIndex++;
+            const suffix = slotIndex > 1 ? `-${slotIndex}` : "";
+            s.slots.push({
+              id: `slot-auto-${date}-${start.replace(":", "")}${suffix}`,
+              date,
+              start,
+              end: trainingEnd(start),
+              location: c.location,
+              trainerIds: picked,
+              cancelled: false,
+              deletedAt: null,
+              manual: false,
+              fingerprint: "fp-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6)
+            });
+          } else {
+            break;
+          }
+        }
+      });
+    }
+
+    // ==================== JS: LOGS, LINE NOTIFICATIONS & GAS SYNC ====================
+    function addLog(message, mailTo = "", mailSubject = "", mailBody = "", recipientIds = []) {
+      AppState.state.events.unshift({
+        id: "ev-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5),
+        at: new Date().toISOString(),
+        message
+      });
+      if (mailSubject) {
+        AppState.state.messages.unshift({
+          id: "msg-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5),
+          at: new Date().toISOString(),
+          to: mailTo || "関係者通知（LINE）",
+          subject: mailSubject,
+          body: mailBody,
+          status: "sent"
+        });
+        dispatchLineNotifications(recipientIds, mailSubject, mailBody);
+      }
+    }
+
+    function dispatchLineNotifications(recipientIds, subject, body) {
+      const adminIds = (AppState.state.people || [])
+        .filter(p => (p.isOwner || p.isSuperAdmin || p.isAdmin || p.role === "admin") && p.active && !p.deletedAt)
+        .map(p => p.id);
+      const uniqueIds = Array.from(new Set([...(recipientIds || []), ...adminIds]));
+      if (uniqueIds.length === 0) return;
+      const text = `${subject}\n${body}`;
+
+      uniqueIds.forEach(uid => {
+        if (uid && String(uid).startsWith("U")) {
+          syncWithGAS("notifyLine", {to: uid, text});
+        }
+      });
+    }
+
+    let __syncDebounceTimer = null;
+    function persistLocal(immediate = false) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.state));
+      } catch (e) {
+        console.warn("localStorage保存スキップ:", e);
+      }
+      clearTimeout(__syncDebounceTimer);
+      if (immediate) {
+        return syncWithGAS("syncAll", {state: AppState.state});
+      } else {
+        __syncDebounceTimer = setTimeout(() => {
+          syncWithGAS("syncAll", {state: AppState.state});
+        }, 350);
+        return Promise.resolve(null);
+      }
+    }
+
+    async function syncWithGAS(action, payload = {}) {
+      const liveBadge = $("#live-sync-badge");
+      if (liveBadge) liveBadge.textContent = "⏳ 同期中...";
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: "POST",
+          headers: {"Content-Type": "text/plain"},
+          body: JSON.stringify({action, ...payload})
+        });
+        const stamp = nowTimeStr();
+        if (res.ok) {
+          const json = await res.json().catch(() => ({ok: true}));
+          if (json && json.ok) {
+            if (AppState.state?.config?.sharedRoster && (action === "syncAll" || action === "resyncRoster")) {
+              AppState.state.config.sharedRoster.lastSuccessAt = json.syncedAt || new Date().toISOString();
+              AppState.state.config.sharedRoster.pending = 0;
+              AppState.state.config.sharedRoster.failed = 0;
+            }
+            if (liveBadge) liveBadge.textContent = `🟢 同期済 ${stamp}`;
+          } else {
+            if (liveBadge) liveBadge.textContent = "⚠️ 同期一部エラー";
+          }
+          return json;
+        }
+      } catch (e) {
+        if (liveBadge) liveBadge.textContent = "🟡 ローカル保存";
+      }
+      return null;
+    }
+
+    async function fetchLatestFromGAS(silent = false) {
+      const liveBadge = $("#live-sync-badge");
+      if (!silent && liveBadge) liveBadge.textContent = "⏳ 最新データ取得中...";
+      try {
+        const res = await fetch(GAS_API_URL + "?t=" + Date.now());
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.ok && json.data && Array.isArray(json.data.people)) {
+            AppState.state = json.data;
+            if (!Array.isArray(AppState.state.cancelledBookings)) AppState.state.cancelledBookings = [];
+            if (!Array.isArray(AppState.state.swaps)) AppState.state.swaps = [];
+            if (!Array.isArray(AppState.state.events)) AppState.state.events = [];
+            if (!Array.isArray(AppState.state.messages)) AppState.state.messages = [];
+            normalizeStoresCatalog(AppState.state);
+            if (!AppState.state.config.sharedRoster) {
+              AppState.state.config.sharedRoster = {enabled: true, url: "https://docs.google.com/spreadsheets/", pending: 0, failed: 0, lastSuccessAt: ""};
+            }
+            if (!AppState.state.config.adminPin && AppState.state.config.pin) {
+              AppState.state.config.adminPin = AppState.state.config.pin;
+            }
+            if (!AppState.state.config.trainerPin) {
+              AppState.state.config.trainerPin = AppState.state.config.adminPin || DEFAULT_TRAINER_PIN;
+            }
+            rebuildAutoSlots();
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.state));
+            } catch (e) { }
+            const stamp = nowTimeStr();
+            if (liveBadge) liveBadge.textContent = `🟢 最新同期 ${stamp}`;
+            return true;
+          }
+        }
+      } catch (e) {
+        if (liveBadge) liveBadge.textContent = "🟡 オフライン";
+      }
+      return false;
+    }
+
+    function loadCachedStateFast() {
+      let localData = null;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) localData = JSON.parse(raw);
+      } catch (e) { }
+      AppState.state = localData || createInitialState();
+      normalizeStoresCatalog(AppState.state);
+      if (!AppState.state.config.adminPin) AppState.state.config.adminPin = AppState.state.config.pin || DEFAULT_ADMIN_PIN;
+      if (!AppState.state.config.trainerPin) AppState.state.config.trainerPin = DEFAULT_TRAINER_PIN;
+      if (!AppState.state.config.sharedRoster) {
+        AppState.state.config.sharedRoster = {enabled: true, url: "https://docs.google.com/spreadsheets/", pending: 0, failed: 0, lastSuccessAt: ""};
+      }
+      rebuildAutoSlots();
+    }
+
+    // ==================== JS: UI RENDERING ====================
+    function notify(message) {
+      const el = $("#toast");
+      if (!el) return;
+      el.textContent = message;
+      el.hidden = false;
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {el.hidden = true;}, 4500);
+    }
+
+    function openDialog(html, wide = false) {
+      const dlg = $("#dialog");
+      dlg.classList.toggle("wide-dialog", wide);
+      dlg.innerHTML = html;
+      if (!dlg.open) dlg.showModal();
+      dlg.querySelectorAll("[data-close]").forEach(btn => {
+        btn.onclick = () => dlg.close();
+      });
+    }
+
+    /**
+     * 現在のログインユーザーのレコードを取得（LINE ID未取得時は名簿にゴミデータを作らない）
+     */
+    function getCurrentPerson(createIfMissing = false) {
+      const defaultArea = "金山";
+      const defaultStore = getStoresByArea(defaultArea)[0] || "";
+
+      if (!AppState.currentUserId) {
+        return {
+          id: "",
+          name: AppState.lineDisplayName || "",
+          role: "newcomer",
+          area: defaultArea,
+          store: defaultStore,
+          gender: "",
+          uniformSize: "",
+          age: "",
+          lineWorksId: "",
+          hiredAt: today(),
+          experience: "developing",
+          active: true,
+          isAdmin: false,
+          isOwner: false,
+          isSuperAdmin: false,
+          trainerEnabled: false,
+          online: true,
+          deletedAt: null
+        };
+      }
+
+      let p = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
+      if (!p) {
+        const deletedRecord = AppState.state.people.find(x => x.id === AppState.currentUserId && x.deletedAt);
+        if (deletedRecord && !createIfMissing) {
+          return deletedRecord;
+        }
+        const activeCount = AppState.state.people.filter(x => !x.deletedAt).length;
+        const isFirstUser = activeCount === 0;
+        p = {
+          id: AppState.currentUserId,
+          name: AppState.lineDisplayName || "",
+          role: isFirstUser ? "admin" : "newcomer",
+          area: defaultArea,
+          store: defaultStore,
+          gender: "",
+          uniformSize: "",
+          age: "",
+          lineWorksId: "",
+          hiredAt: today(),
+          experience: isFirstUser ? "veteran" : "developing",
+          active: true,
+          isAdmin: isFirstUser,
+          isOwner: isFirstUser,
+          isSuperAdmin: isFirstUser,
+          trainerEnabled: isFirstUser,
+          online: true,
+          deletedAt: null
+        };
+        if (createIfMissing || isFirstUser) {
+          AppState.state.people.push(p);
+        }
+      }
+      return p;
+    }
+
+    /**
+     * LINEログイン後にロールを自動判定し、TR・管理者は専用画面へ直接振り分ける
+     */
+    function applyAutoRoleRouting() {
+      if (!AppState.currentUserId) return;
+      const existing = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
+      if (!existing) {
+        // 名簿に未登録のLINE IDは新人としてそのまま新人予約画面へ
+        return;
+      }
+
+      if (isAdminPerson(existing)) {
+        AppState.isAdminPinVerified = true;
+        AppState.isTrainerPinVerified = true;
+        AppState.role = "admin";
+        return;
+      }
+
+      if (isTrainerPerson(existing)) {
+        AppState.isTrainerPinVerified = true;
+        AppState.role = "trainer";
+        const nextOpen = detectNextOpenPeriod(operatingOf());
+        AppState.month = nextOpen.month;
+        AppState.workflowHalf = nextOpen.half;
+        syncDraftCalendarFromState();
+      }
+    }
+
+    function storeOptionsHtml(area, selectedStore = "") {
+      const stores = getStoresByArea(area, selectedStore);
+      if (stores.length === 0) {
+        return `<option value="">（このエリアに店舗が未登録です）</option>`;
+      }
+      return stores.map(stName => `<option value="${esc(stName)}" ${stName === selectedStore ? "selected" : ""}>${esc(stName)}</option>`).join("");
+    }
+
+    function headerHtml(title) {
+      return `
+        <div class="hero">
+          <h1>${esc(title)}</h1>
+          <div class="month-control">
+            <button type="button" data-month="-1" aria-label="前月">‹</button>
+            <strong>${monthLabel(AppState.month)}</strong>
+            <button type="button" data-month="1" aria-label="翌月">›</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function halfControlHtml() {
+      return `
+        <div class="tabs half-tabs">
+          <button type="button" data-half="1" class="${AppState.workflowHalf === 1 ? "active" : ""}">前半（1〜15日）</button>
+          <button type="button" data-half="2" class="${AppState.workflowHalf === 2 ? "active" : ""}">後半（16日〜末日）</button>
+        </div>
+      `;
+    }
+
+    function inCurrentHalf(dateStr) {
+      return dateStr.startsWith(AppState.month) && (Number(dateStr.slice(8, 10)) <= 15 ? 1 : 2) === AppState.workflowHalf;
+    }
+
+    function getMyAvailability(personId) {
+      return (AppState.state.availability || []).find(
+        a => a.personId === personId && a.month === AppState.month && a.half === AppState.workflowHalf
+      );
+    }
+
+    function slotCardHtml(s, selected, mode) {
+      const bookings = AppState.state.bookings.filter(b => b.slotId === s.id);
+      const count = bookings.length;
+      const me = getCurrentPerson();
+      const c = operatingOf();
+      const daysFromHire = me?.hiredAt
+        ? Math.round((new Date(s.date + "T00:00:00+09:00") - new Date(me.hiredAt + "T00:00:00+09:00")) / 86400000)
+        : null;
+      const eligible = isSlotEligible(s);
+
+      let statusLabel = "TR 2名確定（ベテラン入）";
+      if (s.cancelled) statusLabel = "中止";
+      else if (!eligible) statusLabel = "受付条件外 / 締切済";
+      else if (mode === "summary" && count === 0) statusLabel = "新人画面に公開中（予約待ち）";
+      else if (mode === "summary" && count > 0) statusLabel = "新人予約あり・開催確定";
+
+      let actionBtn = "";
+      if (mode === "book") {
+        actionBtn = `<button type="button" class="btn ${selected ? "secondary" : ""}" data-book="${s.id}" ${selected ? "disabled" : ""}>${selected ? "✓ 予約済み" : "この日に予約する"}</button>`;
+      } else if (mode === "admin") {
+        actionBtn = `<button type="button" class="btn secondary" data-edit-slot="${s.id}">予定・参加者編集</button>`;
+      }
+
+      return `
+        <div class="slot ${selected ? "confirmed" : ""}">
+          <div class="date-block">
+            <small>${Number(s.date.slice(5, 7))}月</small>
+            <b>${Number(s.date.slice(8, 10))}</b>
+            <small>${new Date(s.date + "T00:00:00+09:00").toLocaleDateString("ja-JP", {weekday: "short", timeZone: "Asia/Tokyo"})}</small>
+          </div>
+          <div class="slot-info">
+            <strong>${esc(s.start)} 〜 ${esc(s.end)}</strong>
+            <span class="pill">${statusLabel}</span>
+            ${mode === "book" && daysFromHire !== null && daysFromHire >= 0 && daysFromHire <= c.targetDays ? `<span class="pill" style="background:#fff0df;color:#c96100;">採用から${c.targetDays}日以内推奨</span>` : ""}
+            <div class="meta">会場：${esc(s.location)}（4時間）</div>
+            <div class="meta">担当TR：${s.trainerIds.map(id => esc(personName(id))).join(" / ")} ・ 予約新人：${count}名</div>
+          </div>
+          ${actionBtn}
+        </div>
+      `;
+    }
+
+    // ==================== ① 新人用画面 ====================
+    function renderNewcomerView() {
+      const me = getCurrentPerson();
+      const c = operatingOf();
+      const areas = getAvailableAreas();
+      const selectedArea = areas.includes(me.area) ? me.area : (areas[0] || "金山");
+      const booking = me.id ? AppState.state.bookings.find(b => b.personId === me.id && b.month === AppState.month) : null;
+      const reservedSlot = booking ? AppState.state.slots.find(s => s.id === booking.slotId) : null;
+      const profileComplete = !!(me.name && me.gender && me.uniformSize && me.area && me.store);
+
+      const candidates = AppState.state.slots
+        .filter(s => s.date.startsWith(AppState.month) && !s.cancelled && !s.deletedAt && s.date >= today() && isSlotEligible(s))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+
+      const nextYm = addMonths(AppState.month, 1);
+      const nextMonthCandidates = AppState.state.slots
+        .filter(s => s.date.startsWith(nextYm) && !s.cancelled && !s.deletedAt && s.date >= today() && isSlotEligible(s));
+
+      return `
+        ${headerHtml("① 新人 OFF研修 予約・案内")}
+
+        <div class="welcome-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+            <div>
+              <h2 style="color:var(--orange-dark); margin-bottom:6px;">🎉 ぐっとくるダイニングへようこそ！！</h2>
+              <p style="font-weight:700; font-size:13px; color:#9b5d20; margin:0;">
+                まずは下のプロフィール（氏名・所属エリア・所属店舗・性別・制服サイズ）を保存し、開催候補日から希望のOFF研修日を予約してください。
+              </p>
+            </div>
+            <button type="button" class="btn secondary" data-switch-staff-role="trainer" style="font-size:11px; padding:7px 11px;">
+              🔑 TR・管理者はこちら
+            </button>
+          </div>
+          <div class="venue-box">
+            📍 <strong>OFF研修 開催場所・時間</strong><br>
+            <strong>会場：</strong>${esc(c.location)}<br>
+            <strong>時間：</strong>17:00〜22:00のうち4時間（休憩込／予約枠の開始時刻にお越しください）<br>
+            <a class="map-link-btn" href="${VENUE_MAP_URL}" target="_blank" rel="noopener noreferrer">🗺️ Googleマップで会場の場所を開く</a>
+          </div>
+        </div>
+
+        <section class="panel" id="newcomer-profile-section">
+          <div class="section-title">
+            <h2>新人プロフィール ＆ 制服サイズ設定</h2>
+            <span class="tag" style="background:${profileComplete ? "#dcfce7;color:#166534" : "#fee2e2;color:#991b1b"};">
+              ${profileComplete ? "✓ 設定完了" : "※予約前に必須"}
+            </span>
+          </div>
+          <form id="newcomer-profile-form">
+            <div>
+              <label>新人氏名（表示名） *必須</label>
+              <input type="text" name="name" required value="${esc(me.name)}" placeholder="例: 新人 花子">
+            </div>
+            <div class="row">
+              <div>
+                <label>所属エリア *必須</label>
+                <select name="area" data-area-select="newcomer-store-select" required>
+                  ${areas.map(a => `<option value="${esc(a)}" ${selectedArea === a ? "selected" : ""}>${esc(a)}</option>`).join("")}
+                </select>
+              </div>
+              <div>
+                <label>所属店舗 *必須</label>
+                <select name="store" id="newcomer-store-select" required>
+                  ${storeOptionsHtml(selectedArea, me.store)}
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>性別 *必須</label>
+                <select name="gender" required>
+                  <option value="">選択してください</option>
+                  ${["男性", "女性", "その他"].map(g => `<option value="${g}" ${me.gender === g ? "selected" : ""}>${g}</option>`).join("")}
+                </select>
+              </div>
+              <div>
+                <label>制服サイズ（支給用） *必須</label>
+                <select name="uniformSize" required>
+                  <option value="">選択してください</option>
+                  ${(c.uniformSizes.length ? c.uniformSizes : ["S", "M", "L", "XL", "3L"]).map(sz => `<option value="${esc(sz)}" ${me.uniformSize === sz ? "selected" : ""}>${esc(sz)}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>年齢（任意）</label>
+                <input type="number" name="age" min="15" max="99" value="${esc(me.age || "")}" placeholder="例: 21">
+              </div>
+              <div>
+                <label>LINE WORKS ID（発行済みの場合）</label>
+                <input type="text" name="lineWorksId" value="${esc(me.lineWorksId || "")}" placeholder="未発行の場合は空欄でOK">
+              </div>
+            </div>
+            <button type="submit" class="btn full">新人プロフィールを保存する</button>
+          </form>
+
+          ${AppState.newcomerSaveFeedback ? `
+            <div class="save-success-banner" id="newcomer-save-banner" role="alert">
+              <span>✅ ${esc(AppState.newcomerSaveFeedback)}</span>
+              <a href="#newcomer-candidates-section" class="btn green" style="padding:7px 12px; font-size:12px; text-decoration:none;">↓ 下の候補日から予約する</a>
+            </div>
+          ` : ""}
+        </section>
+
+        <div class="grid">
+          <section class="panel" id="newcomer-candidates-section">
+            <div class="section-title">
+              <h2>参加できるOFF研修 候補日一覧（${monthLabel(AppState.month)}）</h2>
+              <span class="count">${candidates.length}件の開催枠</span>
+            </div>
+            <p class="hint">
+              ※ベテラン1名以上を含むTR2名体制が揃った日程が自動で表示されます。同じ候補日に複数の新人が予約可能です。<br>
+              ※予約締切：${c.bookingDaysBefore ? c.bookingDaysBefore + "日前" : "開催当日"} ${esc(c.bookingDeadline)}（開始時刻まで）
+            </p>
+            ${candidates.map(s => slotCardHtml(s, s.id === booking?.slotId, "book")).join("") || `
+              <div class="empty">
+                現在 ${monthLabel(AppState.month)} に予約可能な開催候補がありません。<br>
+                TRの日程ペアが揃うと自動で表示されます。
+              </div>
+            `}
+            ${nextMonthCandidates.length > 0 ? `
+              <div class="notice" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:16px;">
+                <span>📅 <strong>${monthLabel(nextYm)}</strong> に予約可能な開催候補が <strong>${nextMonthCandidates.length}件</strong> あります！</span>
+                <button type="button" class="btn" data-month="1">${monthLabel(nextYm)}の候補日を見る →</button>
+              </div>
+            ` : ""}
+          </section>
+
+          <div>
+            <section class="panel">
+              <h2>あなたの予約状況</h2>
+              ${reservedSlot ? `
+                <div class="welcome">✓</div>
+                <strong>${fmt(reservedSlot.date)}</strong>
+                <p style="font-size:15px; font-weight:700; margin:4px 0;">${esc(reservedSlot.start)} 〜 ${esc(reservedSlot.end)}</p>
+                <p class="meta">${esc(reservedSlot.location)}</p>
+                <p class="meta">担当TR：${reservedSlot.trainerIds.map(id => esc(personName(id))).join(" / ")}</p>
+                <div class="notice">${reservedSlot.cancelled ? "⚠️ この研修は中止されました。別の候補日を選び直してください。" : "ステータス：" + esc(booking.status)}</div>
+                <p class="hint">現場研修（6日間）進捗：${(booking.fieldDays || []).length} / 6日完了</p>
+              ` : '<p class="sub" style="margin-top:14px;">まだ予約は確定していません。<br>左の候補日から希望日を選んで「この日に予約する」を押してください。</p>'}
+              <p class="hint" style="margin-top:12px;">※同じ月の別候補日を選ぶと日程変更になります。</p>
+            </section>
+
+            <section class="panel">
+              <div class="section-title">
+                <h2>あなたへの通知</h2>
+                <button type="button" class="btn secondary" id="btn-open-notices">履歴を見る</button>
+              </div>
+              <p class="hint">予約確定・日程変更の通知履歴を確認できます。</p>
+            </section>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==================== ② TR用画面 ====================
+    function syncDraftCalendarFromState() {
+      const me = getCurrentPerson();
+      const mine = getMyAvailability(me.id);
+      AppState.draftCalendarMap = {};
+      if (mine && Array.isArray(mine.entries)) {
+        mine.entries.forEach(ent => {
+          AppState.draftCalendarMap[ent.date] = {
+            selected: true,
+            times: ent.isAllDay ? [] : [...(ent.starts || [])]
+          };
+        });
+      }
+    }
+
+    function renderTrainerCalendarGrid(isPeriodExpired) {
+      const c = operatingOf();
+      const todayStr = today();
+      const [year, m] = AppState.month.split("-").map(Number);
+      const startDay = AppState.workflowHalf === 1 ? 1 : 16;
+      const daysInMonth = new Date(year, m, 0).getDate();
+      const endDay = AppState.workflowHalf === 1 ? 15 : daysInMonth;
+      const firstDayIndex = new Date(year, m - 1, startDay).getDay();
+
+      const lockedDates = new Set(
+        AppState.state.slots
+          .filter(s => inCurrentHalf(s.date) && !s.cancelled && !s.deletedAt && s.trainerIds.includes(AppState.currentUserId) && AppState.state.bookings.some(b => b.slotId === s.id))
+          .map(s => s.date)
+      );
+
+      let cells = "";
+      for (let i = 0; i < firstDayIndex; i++) {
+        cells += `<div></div>`;
+      }
+
+      for (let day = startDay; day <= endDay; day++) {
+        const dateStr = `${year}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const draft = AppState.draftCalendarMap[dateStr];
+        const isSelected = !!draft?.selected;
+        const isLockedDate = lockedDates.has(dateStr);
+        const isPastDate = dateStr < todayStr;
+        const disabled = c.isLocked || isPeriodExpired || isLockedDate || isPastDate;
+
+        let badge = "";
+        if (isSelected) {
+          if (isLockedDate) badge = `<span class="time-badge">🔒確定済</span>`;
+          else if (draft.times && draft.times.length > 0) badge = `<span class="time-badge">${draft.times[0]}~</span>`;
+          else badge = `<span class="time-badge">終日可</span>`;
+        } else if (isPastDate) {
+          badge = `<span style="font-size:9px;color:#94a3b8;">終了</span>`;
+        }
+
+        cells += `
+          <div class="cal-day ${isSelected ? "selected" : ""} ${disabled ? "disabled" : ""}" data-tr-cal-date="${dateStr}" data-disabled-reason="${isPastDate ? "past" : isPeriodExpired ? "expired" : isLockedDate ? "booked" : c.isLocked ? "locked" : ""}">
+            <span>${day}</span>
+            ${badge}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="calendar-grid">
+          <div class="cal-header">日</div><div class="cal-header">月</div><div class="cal-header">火</div>
+          <div class="cal-header">水</div><div class="cal-header">木</div><div class="cal-header">金</div>
+          <div class="cal-header">土</div>
+        </div>
+        <div class="calendar-grid">${cells}</div>
+      `;
+    }
+
+    function swapListHtml() {
+      const me = getCurrentPerson();
+      const swaps = (AppState.state.swaps || [])
+        .filter(q => {
+          const slot = AppState.state.slots.find(s => s.id === q.slotId);
+          return slot && slot.date.startsWith(AppState.month);
+        })
+        .slice()
+        .reverse();
+
+      const statusText = {
+        pending: "⏳ 相手の承諾待ち",
+        accepted: "✅ 交代確定",
+        declined: "❌ 辞退（再調整が必要）",
+        cancelled: "取り消し済み"
+      };
+
+      return swaps.map(q => {
+        const s = AppState.state.slots.find(x => x.id === q.slotId);
+        const toMe = q.toId === me.id;
+        const fromMe = q.fromId === me.id;
+        return `
+          <div class="notice">
+            <strong>${s ? fmt(s.date) + " " + s.start : "研修"} ／ ${statusText[q.status] || q.status}</strong>
+            <p style="margin:4px 0;">依頼元：${esc(personName(q.fromId))} → 依頼先：${esc(personName(q.toId))}</p>
+            ${q.reason ? `<p class="hint">理由・引継ぎ：${esc(q.reason)}</p>` : ""}
+            <div class="small-actions" style="margin-top:8px;">
+              ${q.status === "pending" && toMe ? `
+                <button type="button" class="btn green" data-swap-answer="accept" data-swap-id="${q.id}">交代を承諾する</button>
+                <button type="button" class="btn secondary" data-swap-answer="decline" data-swap-id="${q.id}">辞退する</button>
+              ` : ""}
+              ${q.status === "pending" && (fromMe || AppState.role === "admin") ? `
+                <button type="button" class="btn danger" data-swap-answer="cancel" data-swap-id="${q.id}">依頼を取り消す</button>
+              ` : ""}
+            </div>
+          </div>
+        `;
+      }).join("") || '<div class="empty">現在、交代依頼はありません。</div>';
+    }
+
+    function renderTrainerView() {
+      const me = getCurrentPerson();
+      const c = operatingOf();
+      const areas = getAvailableAreas();
+      const selectedArea = areas.includes(me.area) ? me.area : (areas[0] || "金山");
+      const mine = getMyAvailability(me.id);
+      const deadline = submissionDeadline(AppState.month, AppState.workflowHalf, c);
+      const isExpired = isSubmissionPeriodExpired(AppState.month, AppState.workflowHalf, c);
+      const nextOpen = detectNextOpenPeriod(c);
+      const isFormLocked = c.isLocked || isExpired;
+      const activeStartsLabel = (c.starts && c.starts.length) ? c.starts.join(" / ") : "17:00〜18:30";
+
+      const mySlots = AppState.state.slots
+        .filter(s => inCurrentHalf(s.date) && s.trainerIds.includes(me.id) && !s.cancelled && !s.deletedAt)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+
+      const unmatchedEntries = (mine?.entries || []).filter(ent =>
+        !mySlots.some(s => s.date === ent.date)
+      );
+
+      const assignedBookings = AppState.state.bookings.filter(b => mySlots.some(s => s.id === b.slotId));
+
+      return `
+        ${headerHtml("② TR 現場・研修日程提出")}
+        ${halfControlHtml()}
+
+        <div class="grid">
+          <div>
+            <section class="panel">
+              <div class="section-title">
+                <h2>${monthLabel(AppState.month)} ${AppState.workflowHalf === 1 ? "前半" : "後半"}の出勤可能日入力</h2>
+                <span class="tag ${me.experience === "veteran" ? "tag-veteran" : "tag-beginner"}">
+                  ${me.experience === "veteran" ? "★ ベテランTR" : "育成中TR"}
+                </span>
+              </div>
+
+              ${c.isLocked ? '<div class="error">🔒 現在、オーナーにより提出がロックされています。</div>' : ""}
+
+              ${isExpired ? `
+                <div class="deadline-banner expired">
+                  <span>🔒 この期間の提出期限（${deadline} 23:59）は終了しました。</span>
+                  <button type="button" class="btn" id="btn-jump-next-open-period" data-open-month="${nextOpen.month}" data-open-half="${nextOpen.half}">
+                    受付中の ${monthLabel(nextOpen.month)} ${nextOpen.half === 1 ? "前半" : "後半"} へ移動 →
+                  </button>
+                </div>
+              ` : `
+                <div class="deadline-banner">
+                  <span>提出期限：${deadline} 23:59（${mine ? "✓ 提出済み・期限内は再編集可" : "受付中・未提出"}）</span>
+                </div>
+              `}
+
+              <p class="hint">
+                ・日付を<strong>1回タップ</strong>すると緑色になり「終日可（有効枠：${esc(activeStartsLabel)}）」で選択されます。<br>
+                ・開始時間を絞りたい場合は、<strong>選択済みの日付をもう一度タップ</strong>して時間帯を指定してください。
+              </p>
+
+              ${renderTrainerCalendarGrid(isExpired)}
+
+              <label style="margin-top:14px;">希望メモ（任意・300文字以内）</label>
+              <textarea id="tr-hope-note" maxlength="300" placeholder="現在の負担や時間帯の希望があればマネージャーへ伝えられます" ${isFormLocked ? "disabled" : ""}>${esc(mine?.hopeNote || "")}</textarea>
+
+              <button type="button" id="btn-save-tr-availability" class="btn green full" ${isFormLocked ? "disabled" : ""}>
+                ${isFormLocked ? "🔒 提出期限終了 / ロック中" : "この内容で提出を完了する（新人候補枠へ自動反映）"}
+              </button>
+
+              ${AppState.trSaveFeedback ? `
+                <div class="save-success-banner" role="alert">
+                  <span>✅ ${esc(AppState.trSaveFeedback)}</span>
+                </div>
+              ` : ""}
+            </section>
+
+            <section class="panel">
+              <h2>新人画面への反映状況 ＆ 担当研修一覧</h2>
+              <p class="hint">同じ日時に「ベテラン1名以上を含むTR2名ペア」が揃うと、自動的に新人画面の予約候補日に公開されます。</p>
+
+              ${mySlots.map(s => {
+        const hasBook = AppState.state.bookings.some(b => b.slotId === s.id);
+        return `
+                  <div>
+                    ${slotCardHtml(s, false, "summary")}
+                    ${hasBook ? `<div class="small-actions slot-actions"><button type="button" class="btn secondary" data-offer-swap="${s.id}">🔄 別のTRへ交代を依頼する</button></div>` : ""}
+                  </div>
+                `;
+      }).join("")}
+
+              ${unmatchedEntries.length > 0 ? `
+                <div class="notice" style="margin-top:14px;">
+                  <strong>⏳ 他のTRの提出待ち日程（ペア成立後に新人画面へ公開されます）</strong>
+                  <ul style="margin:6px 0 0 18px; padding:0; font-size:12px;">
+                    ${unmatchedEntries.map(ent => `
+                      <li>${fmt(ent.date)}（${ent.isAllDay ? "終日可" : ent.starts.join(", ")}） — 相方TR・ベテラン待ち</li>
+                    `).join("")}
+                  </ul>
+                </div>
+              ` : ""}
+
+              ${mySlots.length === 0 && unmatchedEntries.length === 0 ? '<div class="empty">この期間の提出日程はまだありません。</div>' : ""}
+            </section>
+          </div>
+
+          <div>
+            <section class="panel">
+              <h2>TRプロフィール設定</h2>
+              <form id="tr-profile-form">
+                <label>TR氏名（表示名）</label>
+                <input type="text" name="name" required value="${esc(me.name)}" placeholder="例: 山田 太郎">
+                <label>所属エリア</label>
+                <select name="area" data-area-select="tr-store-select">
+                  ${areas.map(a => `<option value="${esc(a)}" ${selectedArea === a ? "selected" : ""}>${esc(a)}</option>`).join("")}
+                </select>
+                <label>所属店舗</label>
+                <select name="store" id="tr-store-select">
+                  ${storeOptionsHtml(selectedArea, me.store)}
+                </select>
+                <button type="submit" class="btn secondary full">名前・エリア・店舗を保存</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <h2>担当研修に参加する新人情報</h2>
+              <p class="hint">あなたが担当する研修の新人プロフィール（所属店舗・サイズ等）です。</p>
+              ${assignedBookings.map(b => {
+        const p = AppState.state.people.find(x => x.id === b.personId);
+        const s = AppState.state.slots.find(x => x.id === b.slotId);
+        if (!p) return "";
+        return `
+                  <div class="notice">
+                    <strong>${esc(p.name)}</strong>（${s ? fmt(s.date) + " " + s.start : ""}）
+                    <dl>
+                      <dt>所属エリア</dt><dd>${esc(p.area || "未設定")}</dd>
+                      <dt>所属店舗</dt><dd>${esc(p.store || "未設定")}</dd>
+                      <dt>性別 / サイズ</dt><dd>${esc(p.gender || "-")} / <strong>${esc(p.uniformSize || "未登録")}</strong></dd>
+                      <dt>年齢</dt><dd>${p.age ? p.age + "歳" : "未登録"}</dd>
+                      <dt>LINE WORKS</dt><dd>${esc(p.lineWorksId || "未発行")}</dd>
+                    </dl>
+                  </div>
+                `;
+      }).join("") || '<p class="hint">担当研修への新人予約はまだありません。</p>'}
+            </section>
+
+            <section class="panel">
+              <h2>TR交代依頼・回答</h2>
+              ${swapListHtml()}
+            </section>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==================== ③ 管理者画面 ====================
     function renderAdminCalendarPanel() {
       const [year, m] = AppState.month.split("-").map(Number);
       const daysInMonth = new Date(year, m, 0).getDate();
       const firstDayIndex = new Date(year, m - 1, 1).getDay();
       const areas = getAvailableAreas();
-      const isOwner = isOwnerUser();
 
       const activeTRs = AppState.state.people.filter(p => isTrainerPerson(p) && p.active && !p.deletedAt);
       const filteredTRIds = new Set(
@@ -72,7 +2347,7 @@
         <div style="margin-top:22px; padding-top:16px; border-top:1px solid var(--line);">
           <div class="section-title">
             <h2>📅 ${esc(selDate)} の日別マッチング詳細</h2>
-            ${isOwner ? `<button type="button" class="btn" id="btn-add-slot-on-date">＋ この日に手動で枠を追加</button>` : ""}
+            <button type="button" class="btn" id="btn-add-slot-on-date">＋ この日に手動で枠を追加</button>
           </div>
           <div class="row">
             <div>
@@ -147,7 +2422,7 @@
         body = `
           <div class="section-title">
             <h2>予約前の新人（未確定フォロー）</h2>
-            ${isOwner ? `<button type="button" class="btn" id="btn-add-person">＋ 新人・TRを登録</button>` : ""}
+            <button type="button" class="btn" id="btn-add-person">＋ 新人・TRを登録</button>
           </div>
           ${pendingNewcomers.map(p => {
           const days = p.hiredAt ? Math.round((new Date(today() + "T00:00:00+09:00") - new Date(p.hiredAt + "T00:00:00+09:00")) / 86400000) : 0;
@@ -157,7 +2432,7 @@
                   <strong>${esc(p.name || "名前未登録")}</strong>（${esc(p.area || "エリア未設定")} ／ ${esc(p.store || "店舗未設定")} ／ 制服:${esc(p.uniformSize || "未登録")}）
                   ${days > c.targetDays ? `<span class="pill" style="background:#fee2e2;color:#991b1b;">目標${c.targetDays}日超過</span>` : ""}
                 </div>
-                ${isOwner ? `<button type="button" class="btn secondary" data-edit-person="${p.id}">登録情報編集</button>` : ""}
+                <button type="button" class="btn secondary" data-edit-person="${p.id}">登録情報編集</button>
               </div>
             `;
         }).join("") || '<p class="hint">現在、予約未確定の新人はいません。</p>'}
@@ -186,7 +2461,7 @@
                       <td>
                         <div class="small-actions">
                           <button type="button" class="btn secondary" data-progress-booking="${b.id}">進捗・6日記録</button>
-                          ${slot && isOwner ? `<button type="button" class="btn secondary" data-edit-slot="${slot.id}">枠編集</button>` : ""}
+                          ${slot ? `<button type="button" class="btn secondary" data-edit-slot="${slot.id}">枠編集</button>` : ""}
                           ${b.status === "OFF研修予定" && isOwner ? `<button type="button" class="btn danger" data-cancel-booking="${b.id}">予約取消</button>` : ""}
                         </div>
                       </td>
@@ -196,7 +2471,7 @@
               </tbody>
             </table>
           </div>
-          ${!isOwner ? '<p class="hint" style="margin-top:10px;">※スタッフの追加・編集、開催枠の変更、予約取消はオーナー権限のみ実行できます。</p>' : ""}
+          ${!isOwner ? '<p class="hint" style="margin-top:10px;">※予約の完全取消はオーナー権限のみ実行できます。</p>' : ""}
         `;
       } else if (AppState.tab === "calendar") {
         body = renderAdminCalendarPanel();
@@ -206,11 +2481,11 @@
           .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
         body = `
           <div class="section-title">
-            <h2>開催候補枠（ランダムペア自動生成${isOwner ? " ＆ 手動登録" : ""}）</h2>
-            ${isOwner ? `<button type="button" class="btn" id="btn-add-slot">＋ 手動で日時・TRを登録</button>` : `<span class="tag">閲覧のみ（枠編集はオーナー専用）</span>`}
+            <h2>開催候補枠（ランダムペア自動生成 ＆ 手動登録）</h2>
+            <button type="button" class="btn" id="btn-add-slot">＋ 手動で日時・TRを登録</button>
           </div>
           <label class="check"><input type="checkbox" id="chk-training-history" ${AppState.trainingHistory ? "checked" : ""}>取消・削除済みの履歴も表示する</label>
-          ${visibleSlots.map(slot => slotCardHtml(slot, false, "admin")).join("") || '<div class="empty">開催候補枠がありません。TRが日程を提出するまでお待ちください。</div>'}
+          ${visibleSlots.map(slot => slotCardHtml(slot, false, "admin")).join("") || '<div class="empty">開催候補枠がありません。TRが日程を提出するか、手動登録してください。</div>'}
         `;
       } else if (AppState.tab === "availability") {
         const unsubmittedTRs = activeTRs.filter(t => !submittedTRIds.has(t.id));
@@ -259,19 +2534,12 @@
 
         body = `
           <div class="section-title">
-            <h2>スタッフ管理（${isOwner ? "一括編集・ランク・権限設定" : "名簿一覧・閲覧のみ"}）</h2>
-            ${isOwner ? `
-              <div class="small-actions">
-                <button type="button" class="btn secondary" id="btn-bulk-staff">選択したスタッフを一括編集</button>
-                <button type="button" class="btn" id="btn-add-person">＋ スタッフを登録</button>
-              </div>
-            ` : `<span class="tag">🔒 編集・追加・削除はオーナー専用</span>`}
-          </div>
-          ${!isOwner ? `
-            <div class="notice">
-              <strong>🔒 権限制限：</strong>スタッフの新規登録・ランク変更・権限付与・削除は<strong>オーナー権限</strong>を持つアカウントのみ操作できます。
+            <h2>スタッフ管理（一括編集・ランク・権限設定）</h2>
+            <div class="small-actions">
+              <button type="button" class="btn secondary" id="btn-bulk-staff">選択したスタッフを一括編集</button>
+              <button type="button" class="btn" id="btn-add-person">＋ スタッフを登録</button>
             </div>
-          ` : ""}
+          </div>
           <div class="row">
             <div>
               <label>区分フィルター</label>
@@ -287,23 +2555,14 @@
               <input type="search" id="inp-staff-search" value="${esc(AppState.staffSearch)}" placeholder="名前・エリア・店舗名で検索">
             </div>
           </div>
-          ${isOwner ? `<label class="check"><input type="checkbox" id="chk-deleted-staff" ${AppState.showDeletedStaff ? "checked" : ""}>削除済みのスタッフを表示する</label>` : ""}
+          <label class="check"><input type="checkbox" id="chk-deleted-staff" ${AppState.showDeletedStaff ? "checked" : ""}>削除済みのスタッフを表示する</label>
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  ${isOwner ? '<th style="width:32px;">選択</th>' : ""}
-                  <th>氏名 / LINE連携</th>
-                  <th>区分 / 権限・ランク</th>
-                  <th>所属エリア・店舗 / 制服</th>
-                  <th>状態</th>
-                  ${isOwner ? '<th>操作</th>' : ""}
-                </tr>
-              </thead>
+              <thead><tr><th style="width:32px;">選択</th><th>氏名 / LINE連携</th><th>区分 / 権限・ランク</th><th>所属エリア・店舗 / 制服</th><th>状態</th><th>操作</th></tr></thead>
               <tbody>
                 ${filteredPeople.map(p => `
                   <tr>
-                    ${isOwner ? `<td><input type="checkbox" data-select-staff="${p.id}" ${AppState.selectedStaff.has(p.id) ? "checked" : ""} ${p.deletedAt ? "disabled" : ""}></td>` : ""}
+                    <td><input type="checkbox" data-select-staff="${p.id}" ${AppState.selectedStaff.has(p.id) ? "checked" : ""} ${p.deletedAt ? "disabled" : ""}></td>
                     <td>
                       <strong>${esc(p.name || "名前未登録")}</strong><br>
                       <span class="pill" style="margin-left:0; background:${String(p.id).startsWith("U") ? "#dcfce7;color:#166534" : "#f1f5f9;color:#64748b"};">
@@ -319,17 +2578,15 @@
                       <span class="hint">${p.role === "newcomer" ? `${esc(p.gender || "-")} / 制服:${esc(p.uniformSize || "-")}` : esc(p.email || "")}</span>
                     </td>
                     <td>${p.deletedAt ? "削除済み" : p.active ? "有効" : "停止中"}</td>
-                    ${isOwner ? `
-                      <td>
-                        <div class="small-actions">
-                          ${p.deletedAt
-                            ? `<button type="button" class="btn secondary" data-restore-person="${p.id}">復元</button>`
-                            : `<button type="button" class="btn secondary" data-edit-person="${p.id}">編集</button>`}
-                        </div>
-                      </td>
-                    ` : ""}
+                    <td>
+                      <div class="small-actions">
+                        ${p.deletedAt
+            ? (isOwner ? `<button type="button" class="btn secondary" data-restore-person="${p.id}">復元</button>` : '<span class="hint">削除済</span>')
+            : `<button type="button" class="btn secondary" data-edit-person="${p.id}">編集</button>`}
+                      </div>
+                    </td>
                   </tr>
-                `).join("") || `<tr><td colspan="${isOwner ? 6 : 4}" class="empty">該当するスタッフはいません。</td></tr>`}
+                `).join("") || '<tr><td colspan="6" class="empty">該当するスタッフはいません。</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -339,20 +2596,12 @@
         body = `
           <div class="section-title">
             <h2>店舗・エリア管理</h2>
-            ${isOwner ? `<button type="button" class="btn" id="btn-add-store">＋ 店舗を追加</button>` : `<span class="tag">🔒 編集・追加・削除はオーナー専用</span>`}
+            <button type="button" class="btn" id="btn-add-store">＋ 店舗を追加</button>
           </div>
-          ${isOwner ? `<label class="check"><input type="checkbox" id="chk-deleted-stores" ${AppState.showDeletedStores ? "checked" : ""}>削除済みの店舗を表示する</label>` : ""}
+          <label class="check"><input type="checkbox" id="chk-deleted-stores" ${AppState.showDeletedStores ? "checked" : ""}>削除済みの店舗を表示する</label>
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>所属エリア</th>
-                  <th>店舗名</th>
-                  <th>所属人数</th>
-                  <th>状態</th>
-                  ${isOwner ? "<th>操作</th>" : ""}
-                </tr>
-              </thead>
+              <thead><tr><th>所属エリア</th><th>店舗名</th><th>所属人数</th><th>状態</th><th>操作</th></tr></thead>
               <tbody>
                 ${stores.map(st => `
                   <tr>
@@ -360,13 +2609,11 @@
                     <td><strong>${esc(st.name)}</strong></td>
                     <td>${s.people.filter(p => !p.deletedAt && p.store === st.name).length}名</td>
                     <td>${st.deletedAt ? "削除済み" : st.active ? "有効" : "停止中"}</td>
-                    ${isOwner ? `
-                      <td>
-                        ${st.deletedAt
-                          ? `<button type="button" class="btn secondary" data-restore-store="${st.id}">復元</button>`
-                          : `<button type="button" class="btn secondary" data-edit-store="${st.id}">編集</button>`}
-                      </td>
-                    ` : ""}
+                    <td>
+                      ${st.deletedAt
+            ? (isOwner ? `<button type="button" class="btn secondary" data-restore-store="${st.id}">復元</button>` : '<span class="hint">削除済</span>')
+            : `<button type="button" class="btn secondary" data-edit-store="${st.id}">編集</button>`}
+                    </td>
                   </tr>
                 `).join("")}
               </tbody>
@@ -388,7 +2635,7 @@
           </div>
           <div class="notice">
             <strong>新人共有（アプリ版）シート連携：</strong>${sr.enabled !== false ? "🟢 自動連携ON" : "⚪ 停止中"} ／ 最終反映：<strong>${esc(lastSyncLabel)}</strong><br>
-            <span class="hint">※「新人共有（最新）」への誤書き込みを防止し、アプリ版シートの同一新人行へ所属エリア・所属店舗・予約日時・担当TR・現場6日進捗だけを追記更新します（バディ・紹介者名・備考等の手入力列は保持）。<br>※共有シートURLの変更は「⚙️ 各種設定」タブで行えます（オーナー専用）。</span>
+            <span class="hint">※「新人共有（最新）」への誤書き込みを防止し、アプリ版シートの同一新人行へ所属エリア・所属店舗・予約日時・担当TR・現場6日進捗だけを追記更新します（バディ・紹介者名・備考等の手入力列は保持）。<br>※共有シートURLの変更は「⚙️ 各種設定」タブで行えます。</span>
           </div>
           <h3>通知配信履歴（LINEプッシュ ＆ アプリ内通知）</h3>
           ${(s.messages || []).slice(0, 20).map(m => `
@@ -431,7 +2678,7 @@
             </div>
           ` : `
             <div class="notice">
-              <strong>🔒 権限制限：</strong>現在「一般管理者」として閲覧中です。PINコードの再設定、提出ロック切替、システムルール変更、データ削除は<strong>オーナー権限</strong>を持つアカウントのみ実行できます。
+              <strong>🔒 権限制限：</strong>現在「一般管理者」として閲覧中です。PINコードの再設定、データ削除、システムルール変更は<strong>オーナー権限</strong>を持つアカウントのみ実行できます。
             </div>
           `}
 
@@ -525,7 +2772,7 @@
           <button type="button" class="dash-tile" data-jump-tab="slots">
             <div class="dash-tile-top"><span>📅 受付中の開催候補枠</span><span>${monthLabel(AppState.month)}</span></div>
             <div class="dash-tile-num" style="color:var(--orange-dark);">${eligibleSlotsCount}件</div>
-            <div class="dash-tile-foot"><span>開催候補枠を確認</span><span>開く ›</span></div>
+            <div class="dash-tile-foot"><span>開催候補枠を管理・追加</span><span>開く ›</span></div>
           </button>
 
           <button type="button" class="dash-tile" data-jump-tab="bookings">
@@ -543,14 +2790,14 @@
           <button type="button" class="dash-tile" data-jump-tab="people">
             <div class="dash-tile-top"><span>👥 稼働TR（ベテラン）</span><span>計 ${activeTRs.length}名</span></div>
             <div class="dash-tile-num" style="color:var(--highlight);">${veteranTRs.length}名</div>
-            <div class="dash-tile-foot"><span>スタッフ一覧を見る</span><span>開く ›</span></div>
+            <div class="dash-tile-foot"><span>スタッフ・ランク管理へ</span><span>開く ›</span></div>
           </button>
         </div>
 
         <!-- クイックリンク -->
-        <div class="quick-link-bar" style="${!isOwner ? "grid-template-columns: repeat(3, minmax(0, 1fr));" : ""}">
+        <div class="quick-link-bar">
           <button type="button" class="quick-link-btn" data-jump-tab="calendar">📅 月間カレンダー集計</button>
-          ${isOwner ? `<button type="button" class="quick-link-btn" id="btn-add-slot">＋ 開催枠を手動追加</button>` : ""}
+          <button type="button" class="quick-link-btn" id="btn-add-slot">＋ 開催枠を手動追加</button>
           <button type="button" class="quick-link-btn" id="btn-export-csv">📥 月間CSV出力</button>
           <a class="quick-link-btn" href="${esc(s.config.sharedRoster?.url || "https://docs.google.com/spreadsheets/")}" target="_blank" rel="noopener noreferrer">📊 新人共有シートを開く</a>
         </div>
@@ -657,11 +2904,8 @@
     }
 
     function openSlotFormModal(slotId = "", defaultDate = "") {
-      if (!isOwnerUser()) {
-        notify("⚠️ 開催枠の作成・編集はオーナー権限のみ実行できます。");
-        return;
-      }
       const c = operatingOf();
+      const isOwner = isOwnerUser();
       const s = slotId
         ? AppState.state.slots.find(x => x.id === slotId)
         : {date: defaultDate || AppState.month + "-01", start: c.starts[0], end: trainingEnd(c.starts[0]), location: c.location, trainerIds: []};
@@ -696,12 +2940,12 @@
           `).join("")}
 
           ${slotId ? `
-            <label style="margin-top:14px;">参加新人（チェックで追加・外すと個別予約取消）</label>
+            <label style="margin-top:14px;">参加新人（チェックで追加${isOwner ? "・外すと個別予約取消" : ""}）</label>
             ${activeNewcomers.map(n => {
         const isChecked = bookings.some(b => b.personId === n.id);
         return `
                 <label class="check">
-                  <input type="checkbox" name="personIds" value="${n.id}" ${isChecked ? "checked" : ""}>
+                  <input type="checkbox" name="personIds" value="${n.id}" ${isChecked ? "checked" : ""} ${isChecked && !isOwner ? "disabled" : ""}>
                   ${esc(n.name || "名前未登録")}（${esc(n.area || "-")} / ${esc(n.store || "-")} / 制服:${esc(n.uniformSize || "-")}）
                 </label>
               `;
@@ -710,12 +2954,12 @@
 
           <button type="submit" class="btn full">この内容で保存する</button>
         </form>
-        ${slotId ? `
+        ${slotId && isOwner ? `
           <div class="small-actions" style="margin-top:12px;">
             ${!s.cancelled ? `<button type="button" class="btn danger" id="btn-cancel-slot">研修全体を中止</button>` : ""}
             <button type="button" class="btn danger" id="btn-hide-slot">一覧から削除（履歴保持）</button>
           </div>
-        ` : ""}
+        ` : slotId ? '<p class="hint" style="margin-top:10px;">※研修全体の中止・削除・既存予約の取消はオーナー権限のみ実行できます。</p>' : ""}
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
@@ -742,6 +2986,7 @@
           const checkedNewcomers = new Set(f.getAll("personIds"));
           AppState.state.bookings = AppState.state.bookings.filter(b => {
             if (b.slotId !== slotId) return true;
+            if (!isOwner) return true;
             if (checkedNewcomers.has(b.personId)) return true;
             AppState.state.cancelledBookings.push({...b, status: "オーナーにより個別取消", cancelledAt: new Date().toISOString()});
             return false;
@@ -788,6 +3033,10 @@
       };
 
       $("#btn-cancel-slot")?.addEventListener("click", () => {
+        if (!isOwner) {
+          notify("⚠️ この操作はオーナー権限のみ実行できます。");
+          return;
+        }
         if (!confirm("この研修全体を取り消しますか？（関係する新人・TRへLINE通知されます）")) return;
         s.cancelled = true;
         const bookedIds = AppState.state.bookings.filter(b => b.slotId === s.id).map(b => b.personId);
@@ -805,6 +3054,10 @@
       });
 
       $("#btn-hide-slot")?.addEventListener("click", () => {
+        if (!isOwner) {
+          notify("⚠️ この操作はオーナー権限のみ実行できます。");
+          return;
+        }
         if (!confirm("通常一覧から削除しますか？（履歴データは保持されます）")) return;
         s.deletedAt = new Date().toISOString();
         addLog(`研修枠（${s.date} ${s.start}）を一覧から削除しました（履歴保持）`);
@@ -924,10 +3177,7 @@
     }
 
     function openPersonFormModal(personId = "") {
-      if (!isOwnerUser()) {
-        notify("⚠️ スタッフの登録・編集はオーナー権限のみ実行できます。");
-        return;
-      }
+      const isOwner = isOwnerUser();
       const areas = getAvailableAreas();
       const p = personId
         ? AppState.state.people.find(x => x.id === personId)
@@ -999,14 +3249,16 @@
           <label class="check"><input type="checkbox" name="active" ${p.active ? "checked" : ""}>アカウントを有効にする</label>
           <label class="check"><input type="checkbox" name="isAdmin" ${p.isAdmin || p.role === "admin" ? "checked" : ""}>管理者権限を付与する（TRとの兼任可）</label>
           <label class="check"><input type="checkbox" name="trainerEnabled" ${p.trainerEnabled || p.role === "trainer" ? "checked" : ""}>TRとしても稼働する（兼任設定）</label>
-          <label class="check" style="color:#b91c1c; font-weight:700;">
-            <input type="checkbox" name="isOwner" ${(p.isOwner || p.isSuperAdmin) ? "checked" : ""}>
-            👑 オーナー権限（スタッフ管理・データ削除・PIN再設定・設定変更可）
-          </label>
+          ${isOwner ? `
+            <label class="check" style="color:#b91c1c; font-weight:700;">
+              <input type="checkbox" name="isOwner" ${(p.isOwner || p.isSuperAdmin) ? "checked" : ""}>
+              👑 オーナー権限（データ削除・PIN再設定・設定変更可）
+            </label>
+          ` : ""}
 
           <button type="submit" class="btn full">保存する</button>
         </form>
-        ${personId ? `<button type="button" class="btn danger full" id="btn-delete-person">このスタッフを削除（履歴は保持）</button>` : ""}
+        ${personId && isOwner ? `<button type="button" class="btn danger full" id="btn-delete-person">このスタッフを削除（履歴は保持）</button>` : personId ? '<p class="hint" style="margin-top:10px;">※スタッフの削除はオーナー権限のみ実行できます。</p>' : ""}
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
@@ -1014,7 +3266,7 @@
         e.preventDefault();
         const f = new FormData(e.target);
         const role = f.get("role");
-        const nextOwner = f.has("isOwner");
+        const nextOwner = isOwner ? f.has("isOwner") : !!(p.isOwner || p.isSuperAdmin);
 
         if (personId && (p.isOwner || p.isSuperAdmin) && !nextOwner) {
           const otherOwners = AppState.state.people.filter(x => x.id !== personId && (x.isOwner || x.isSuperAdmin) && !x.deletedAt);
@@ -1042,7 +3294,7 @@
 
         if (personId) {
           Object.assign(p, data);
-          addLog(`オーナーがスタッフ「${p.name}」の登録情報を更新しました`);
+          addLog(`スタッフ「${p.name}」の登録情報を更新しました`);
         } else {
           const newPerson = {
             id: "user-" + Date.now(),
@@ -1052,7 +3304,7 @@
             deletedAt: null
           };
           AppState.state.people.push(newPerson);
-          addLog(`オーナーが新規スタッフ「${newPerson.name}」を登録しました`);
+          addLog(`新規スタッフ「${newPerson.name}」を登録しました`);
         }
         rebuildAutoSlots();
         persistLocal(true);
@@ -1062,6 +3314,10 @@
       };
 
       $("#btn-delete-person")?.addEventListener("click", () => {
+        if (!isOwner) {
+          notify("⚠️ スタッフの削除はオーナー権限のみ実行できます。");
+          return;
+        }
         if (p.isOwner || p.isSuperAdmin) {
           const otherOwners = AppState.state.people.filter(x => x.id !== p.id && (x.isOwner || x.isSuperAdmin) && !x.deletedAt);
           if (otherOwners.length === 0) {
@@ -1072,7 +3328,7 @@
         if (!confirm(`「${p.name}」を削除しますか？（過去の研修履歴は保持され、後から復元できます）`)) return;
         p.deletedAt = new Date().toISOString();
         p.active = false;
-        addLog(`オーナーがスタッフ「${p.name}」を削除しました（履歴保持）`);
+        addLog(`スタッフ「${p.name}」を削除しました（履歴保持）`);
         rebuildAutoSlots();
         persistLocal(true);
         $("#dialog").close();
@@ -1082,10 +3338,6 @@
     }
 
     function openBulkStaffModal() {
-      if (!isOwnerUser()) {
-        notify("⚠️ スタッフの一括編集はオーナー権限のみ実行できます。");
-        return;
-      }
       const ids = Array.from(AppState.selectedStaff).filter(id => AppState.state.people.some(p => p.id === id && !p.deletedAt));
       if (ids.length === 0) {
         notify("一括編集するスタッフにチェックを入れてください。");
@@ -1148,7 +3400,7 @@
           if (f.get("experience") !== "") p.experience = f.get("experience");
           if (f.get("isAdmin") !== "" && !(p.isOwner || p.isSuperAdmin)) p.isAdmin = f.get("isAdmin") === "true";
         });
-        addLog(`オーナーがスタッフ${ids.length}名を一括編集しました`);
+        addLog(`スタッフ${ids.length}名を一括編集しました`);
         AppState.selectedStaff.clear();
         rebuildAutoSlots();
         persistLocal(true);
@@ -1159,10 +3411,7 @@
     }
 
     function openStoreFormModal(storeId = "") {
-      if (!isOwnerUser()) {
-        notify("⚠️ 店舗の登録・編集はオーナー権限のみ実行できます。");
-        return;
-      }
+      const isOwner = isOwnerUser();
       const areas = getAvailableAreas();
       const st = storeId ? AppState.state.stores.find(x => x.id === storeId) : {area: areas[0] || "金山", name: "", active: true};
       openDialog(`
@@ -1177,7 +3426,7 @@
           <label class="check"><input type="checkbox" name="active" ${st.active ? "checked" : ""}>有効にする</label>
           <button type="submit" class="btn full">保存する</button>
         </form>
-        ${storeId ? `<button type="button" class="btn danger full" id="btn-delete-store">店舗を削除（履歴は保持）</button>` : ""}
+        ${storeId && isOwner ? `<button type="button" class="btn danger full" id="btn-delete-store">店舗を削除（履歴は保持）</button>` : ""}
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
@@ -1204,6 +3453,10 @@
       };
 
       $("#btn-delete-store")?.addEventListener("click", () => {
+        if (!isOwner) {
+          notify("⚠️ 店舗の削除はオーナー権限のみ実行できます。");
+          return;
+        }
         if (!confirm(`店舗「${st.name}」を削除しますか？（所属スタッフと履歴は保持されます）`)) return;
         st.deletedAt = new Date().toISOString();
         persistLocal(true);
@@ -1805,6 +4058,7 @@
       document.addEventListener("change", async e => {
         const t = e.target;
 
+        // 所属エリア変更時に連動する所属店舗プルダウンを即座に更新
         if (t.dataset && t.dataset.areaSelect) {
           const storeSelect = document.getElementById(t.dataset.areaSelect);
           if (storeSelect) {
@@ -1864,6 +4118,7 @@
         window.__eventsBound = true;
       }
 
+      // LINEログイン・名簿照合を優先して実行し、TR・管理者は即座に専用画面へ振り分ける
       (async () => {
         try {
           if (window.liff && MY_LIFF_ID) {
@@ -1882,6 +4137,7 @@
           console.warn("LIFF初期化スキップ:", err);
         }
 
+        // GASから最新の名簿データを取得してからロール判定を実行
         await fetchLatestFromGAS(true);
 
         if (AppState.currentUserId) {
