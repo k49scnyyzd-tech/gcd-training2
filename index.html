@@ -3239,15 +3239,26 @@
             </div>
           </div>
 
-          <label class="check"><input type="checkbox" name="active" ${p.active ? "checked" : ""}>アカウントを有効にする</label>
-          <label class="check"><input type="checkbox" name="isAdmin" ${p.isAdmin || p.role === "admin" ? "checked" : ""}>管理者権限を付与する（TRとの兼任可）</label>
-          <label class="check"><input type="checkbox" name="trainerEnabled" ${p.trainerEnabled || p.role === "trainer" ? "checked" : ""}>TRとしても稼働する（兼任設定）</label>
-          ${isOwner ? `
-            <label class="check" style="color:#b91c1c; font-weight:700;">
-              <input type="checkbox" name="isOwner" ${(p.isOwner || p.isSuperAdmin) ? "checked" : ""}>
-              👑 オーナー権限（データ削除・PIN再設定・設定変更可）
+          <div class="field-group" style="background:#f8fafc;padding:12px;border-radius:10px;border:1px solid #e2e8f0;margin-top:8px;">
+            <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;">ステータス・兼任権限設定</div>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+              <input type="checkbox" name="active" ${p.active !== false ? "checked" : ""}>
+              <span>アカウントを有効にする（ログイン・利用許可）</span>
             </label>
-          ` : ""}
+            <label id="wrap-chk-admin" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+              <input type="checkbox" id="chk-isAdmin" name="isAdmin" ${(p.isOwner || p.isSuperAdmin || p.role === "admin" || p.isAdmin) ? "checked" : ""}>
+              <span>管理者権限を付与する（管理画面へのアクセス許可）</span>
+            </label>
+            <label id="wrap-chk-trainer" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+              <input type="checkbox" id="chk-trainerEnabled" name="trainerEnabled" ${(p.role === "trainer" || p.trainerEnabled) ? "checked" : ""}>
+              <span>TRとしても稼働する（初回ログイン時はTR日程提出画面を表示）</span>
+            </label>
+            ${isOwner ? `
+            <label style="display:flex;align-items:center;gap:8px;padding-top:6px;border-top:1px dashed #cbd5e1;cursor:pointer;color:#b45309;font-weight:700;">
+              <input type="checkbox" id="chk-isOwner" name="isOwner" ${(p.isOwner || p.isSuperAdmin) ? "checked" : ""}>
+              <span>👑 オーナー権限を付与する（全設定変更・削除・権限付与可）</span>
+            </label>` : ""}
+          </div>
 
           <button type="submit" class="btn full">保存する</button>
         </form>
@@ -3255,6 +3266,100 @@
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
+      const roleSelect = $("#person-edit-form select[name='role']");
+      const chkAdmin = $("#chk-isAdmin");
+      const chkTrainer = $("#chk-trainerEnabled");
+      const chkOwner = $("#chk-isOwner");
+
+      function syncRoleCheckboxes() {
+        const r = roleSelect.value;
+        const ownerOn = chkOwner ? chkOwner.checked : !!(p.isOwner || p.isSuperAdmin);
+
+        if (r === "admin" || ownerOn) {
+          chkAdmin.checked = true;
+          chkAdmin.disabled = true;
+        } else {
+          chkAdmin.disabled = false;
+        }
+
+        if (r === "trainer") {
+          chkTrainer.checked = true;
+          chkTrainer.disabled = true;
+        } else {
+          chkTrainer.disabled = false;
+        }
+      }
+      roleSelect.addEventListener("change", syncRoleCheckboxes);
+      if (chkOwner) chkOwner.addEventListener("change", syncRoleCheckboxes);
+      syncRoleCheckboxes();
+
+      $("#person-edit-form").onsubmit = async e => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        const role = f.get("role");
+        const nextOwner = isOwner ? f.has("isOwner") : !!(p.isOwner || p.isSuperAdmin);
+
+        if (personId && (p.isOwner || p.isSuperAdmin) && !nextOwner) {
+          const otherOwners = AppState.state.people.filter(x => x.id !== personId && (x.isOwner || x.isSuperAdmin) && !x.deletedAt);
+          if (otherOwners.length === 0) {
+            notify("⚠️ オーナーが0人になるため解除できません。先に別のスタッフへオーナー権限を付与してください。");
+            return;
+          }
+        }
+
+        const nextAdmin = nextOwner || role === "admin" || chkAdmin.checked;
+        const nextTrainer = role === "trainer" || chkTrainer.checked;
+
+        const data = {
+          name: f.get("name").trim(),
+          role,
+          area: f.get("area"),
+          store: f.get("store") || "",
+          experience: f.get("experience"),
+          gender: f.get("gender"),
+          uniformSize: f.get("uniformSize"),
+          email: f.get("email").trim(),
+          active: f.has("active"),
+          isOwner: nextOwner,
+          isSuperAdmin: nextOwner,
+          isAdmin: nextAdmin,
+          trainerEnabled: nextTrainer
+        };
+
+        if (personId) {
+          Object.assign(p, data);
+        } else {
+          AppState.state.people.push({
+            id: uid("staff"),
+            lineWorksId: "",
+            hiredAt: today(),
+            online: false,
+            deletedAt: null,
+            ...data
+          });
+        }
+        closeDialog();
+        await saveAndRender();
+      };
+
+      const delBtn = $("#btn-delete-person");
+      if (delBtn) {
+        delBtn.onclick = async () => {
+          if (!isOwner) return;
+          if (p.isOwner || p.isSuperAdmin) {
+            const otherOwners = AppState.state.people.filter(x => x.id !== personId && (x.isOwner || x.isSuperAdmin) && !x.deletedAt);
+            if (otherOwners.length === 0) {
+              notify("⚠️ 最後のオーナーは削除できません。先に別のスタッフへオーナー権限を付与してください。");
+              return;
+            }
+          }
+          if (!confirm(`「${p.name}」を削除しますか？\n（過去の研修履歴は保持され、一覧からは非表示になります）`)) return;
+          p.deletedAt = nowIso();
+          p.active = false;
+          closeDialog();
+          await saveAndRender();
+        };
+      }
       $("#person-edit-form").onsubmit = async e => {
         e.preventDefault();
         const f = new FormData(e.target);
