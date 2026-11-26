@@ -170,12 +170,13 @@
 
     .owner-claim-btn {
       background: #fffbeb;
-      border: 1px solid #fcd34d;
+      border: 1.5px solid #f59e0b;
       color: #b45309;
-      padding: 4px 10px;
+      padding: 7px 13px;
       border-radius: 999px;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
+      box-shadow: 0 2px 6px rgba(245, 158, 11, 0.15);
     }
 
     .owner-claim-btn:hover {
@@ -277,6 +278,13 @@
       gap: 16px;
       align-items: center;
       margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .hero-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
@@ -1014,6 +1022,11 @@
       box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
     }
 
+    .toast.error-toast {
+      background: #991b1b;
+      border-color: #ef4444;
+    }
+
     @media (max-width: 960px) {
       .grid {
         grid-template-columns: 1fr;
@@ -1112,7 +1125,6 @@
     <div class="top-actions">
       <span id="header-user-badge" class="user-pill">読込中...</span>
       <span id="live-sync-badge" class="sync-pill">同期確認中...</span>
-      <button type="button" id="btn-claim-owner" class="owner-claim-btn">👑 オーナー認証</button>
       <button type="button" id="reload-data" class="text-link">最新情報に更新</button>
     </div>
   </header>
@@ -1161,6 +1173,8 @@
     const DEFAULT_TRAINER_PIN = "123123";
     const OWNER_MASTER_PASS = "gcd2026";
     const STORAGE_KEY = "gcd_merged_training_state_v2";
+    const DEVICE_USER_ID_KEY = "gcd_device_user_id_v1";
+    const OWNER_SESSION_KEY = "gcd_owner_verified_session_v1";
 
     const DEFAULT_AREAS = ["金山", "名駅", "栄", "桜山", "今池", "伏見", "錦"];
 
@@ -1218,6 +1232,39 @@
     const fmt = d => new Date(d + "T00:00:00+09:00").toLocaleDateString("ja-JP", {
       month: "long", day: "numeric", weekday: "short", timeZone: "Asia/Tokyo"
     });
+
+    function getOrCreateDeviceUserId() {
+      try {
+        let uid = localStorage.getItem(DEVICE_USER_ID_KEY);
+        if (!uid) {
+          uid = "dev_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+          localStorage.setItem(DEVICE_USER_ID_KEY, uid);
+        }
+        return uid;
+      } catch (e) {
+        return "dev_session_" + Date.now();
+      }
+    }
+
+    function getSavedOwnerSession() {
+      try {
+        const raw = localStorage.getItem(OWNER_SESSION_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveOwnerSession(ownerId, ownerName = "") {
+      try {
+        localStorage.setItem(OWNER_SESSION_KEY, JSON.stringify({
+          verified: true,
+          ownerId: String(ownerId || ""),
+          ownerName: String(ownerName || ""),
+          savedAt: new Date().toISOString()
+        }));
+      } catch (e) { }
+    }
 
     function addMonths(ym, delta) {
       const d = new Date(ym + "-01T12:00:00Z");
@@ -1366,14 +1413,13 @@
       areaFilter: "すべて",
       staffKind: "all",
       staffSearch: "",
-      showDeletedStaff: false,
       showDeletedStores: false,
       selectedStaff: new Set(),
       trainingHistory: false,
       isTrainerPinVerified: false,
       isAdminPinVerified: false,
       busy: false,
-      currentUserId: "",
+      currentUserId: getOrCreateDeviceUserId(),
       lineDisplayName: "",
       isInitialAuthChecking: true,
       newcomerSaveFeedback: "",
@@ -1393,8 +1439,12 @@
     }
 
     function isOwnerUser(p = getCurrentPerson()) {
-      if (!p) return false;
-      return p.isOwner === true || p.isSuperAdmin === true;
+      if (p && (p.isOwner === true || p.isSuperAdmin === true)) return true;
+      const savedOwner = getSavedOwnerSession();
+      if (savedOwner && savedOwner.verified) {
+        if (!savedOwner.ownerId || savedOwner.ownerId === AppState.currentUserId) return true;
+      }
+      return false;
     }
 
     function operatingOf(s = AppState.state) {
@@ -1576,7 +1626,7 @@
     }
 
     let __syncDebounceTimer = null;
-    function persistLocal(immediate = false) {
+    async function persistLocal(immediate = false) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.state));
       } catch (e) {
@@ -1584,18 +1634,19 @@
       }
       clearTimeout(__syncDebounceTimer);
       if (immediate) {
-        return syncWithGAS("syncAll", {actorId: AppState.currentUserId, state: AppState.state});
+        const res = await syncWithGAS("syncAll", {actorId: AppState.currentUserId, state: AppState.state});
+        return res;
       } else {
         __syncDebounceTimer = setTimeout(() => {
           syncWithGAS("syncAll", {actorId: AppState.currentUserId, state: AppState.state});
         }, 350);
-        return Promise.resolve(null);
+        return {ok: true, queued: true};
       }
     }
 
     async function syncWithGAS(action, payload = {}) {
       const liveBadge = $("#live-sync-badge");
-      if (liveBadge) liveBadge.textContent = "⏳ 同期中...";
+      if (liveBadge) liveBadge.textContent = "⏳ スプレッドシート保存中...";
       try {
         const res = await fetch(GAS_API_URL, {
           method: "POST",
@@ -1604,23 +1655,30 @@
         });
         const stamp = nowTimeStr();
         if (res.ok) {
-          const json = await res.json().catch(() => ({ok: true}));
+          const json = await res.json().catch(() => ({ok: false, error: "応答解析エラー"}));
           if (json && json.ok) {
-            if (AppState.state?.config?.sharedRoster && (action === "syncAll" || action === "resyncRoster")) {
+            if (AppState.state?.config?.sharedRoster && (action === "syncAll" || action === "resyncRoster" || action === "claimOwner")) {
               AppState.state.config.sharedRoster.lastSuccessAt = json.syncedAt || new Date().toISOString();
               AppState.state.config.sharedRoster.pending = 0;
               AppState.state.config.sharedRoster.failed = 0;
             }
-            if (liveBadge) liveBadge.textContent = `🟢 同期済 ${stamp}`;
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.state));
+            } catch (e) { }
+            if (liveBadge) liveBadge.textContent = `🟢 保存完了 ${stamp}`;
+            return json;
           } else {
-            if (liveBadge) liveBadge.textContent = "⚠️ 同期一部エラー";
+            if (liveBadge) liveBadge.textContent = "⚠️ 保存エラー";
+            return json || {ok: false, error: "保存に失敗しました"};
           }
-          return json;
+        } else {
+          if (liveBadge) liveBadge.textContent = "⚠️ 通信エラー";
+          return {ok: false, error: `HTTP ${res.status}`};
         }
       } catch (e) {
-        if (liveBadge) liveBadge.textContent = "🟡 ローカル保存";
+        if (liveBadge) liveBadge.textContent = "🟡 ローカルのみ保存";
+        return {ok: false, error: String(e)};
       }
-      return null;
     }
 
     async function fetchLatestFromGAS(silent = false) {
@@ -1646,12 +1704,13 @@
             if (!AppState.state.config.trainerPin) {
               AppState.state.config.trainerPin = AppState.state.config.adminPin || DEFAULT_TRAINER_PIN;
             }
+            reconcileOwnerSessionWithState();
             rebuildAutoSlots();
             try {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.state));
             } catch (e) { }
             const stamp = nowTimeStr();
-            if (liveBadge) liveBadge.textContent = `🟢 最新同期 ${stamp}`;
+            if (liveBadge) liveBadge.textContent = `🟢 同期済 ${stamp}`;
             return true;
           }
         }
@@ -1659,6 +1718,46 @@
         if (liveBadge) liveBadge.textContent = "🟡 オフライン";
       }
       return false;
+    }
+
+    function reconcileOwnerSessionWithState() {
+      const savedOwner = getSavedOwnerSession();
+      if (!savedOwner || !savedOwner.verified || !AppState.state) return;
+
+      // 現在のIDが既にオーナーならOK
+      const currentPerson = AppState.state.people.find(p => p.id === AppState.currentUserId && !p.deletedAt);
+      if (currentPerson && (currentPerson.isOwner || currentPerson.isSuperAdmin)) {
+        AppState.isAdminPinVerified = true;
+        AppState.isTrainerPinVerified = true;
+        return;
+      }
+
+      // 保存されていたオーナーIDがスプレッドシート上に存在する場合はIDを引き継ぐ
+      if (savedOwner.ownerId) {
+        const storedOwner = AppState.state.people.find(
+          p => p.id === savedOwner.ownerId && !p.deletedAt && (p.isOwner || p.isSuperAdmin)
+        );
+        if (storedOwner) {
+          if (!String(AppState.currentUserId).startsWith("U")) {
+            AppState.currentUserId = storedOwner.id;
+            try {
+              localStorage.setItem(DEVICE_USER_ID_KEY, storedOwner.id);
+            } catch (e) { }
+          } else {
+            // LINEログインIDに切り替わった場合は新IDにもオーナー権限を付与
+            const linePerson = getCurrentPerson(true);
+            linePerson.isOwner = true;
+            linePerson.isSuperAdmin = true;
+            linePerson.isAdmin = true;
+            if (linePerson.role === "newcomer") linePerson.role = "admin";
+            linePerson.active = true;
+            linePerson.deletedAt = null;
+            saveOwnerSession(linePerson.id, linePerson.name);
+          }
+          AppState.isAdminPinVerified = true;
+          AppState.isTrainerPinVerified = true;
+        }
+      }
     }
 
     function loadCachedStateFast() {
@@ -1674,17 +1773,19 @@
       if (!AppState.state.config.sharedRoster) {
         AppState.state.config.sharedRoster = {enabled: true, url: "https://docs.google.com/spreadsheets/", pending: 0, failed: 0, lastSuccessAt: ""};
       }
+      reconcileOwnerSessionWithState();
       rebuildAutoSlots();
     }
 
     // ==================== JS: UI RENDERING ====================
-    function notify(message) {
+    function notify(message, isError = false) {
       const el = $("#toast");
       if (!el) return;
       el.textContent = message;
+      el.classList.toggle("error-toast", isError);
       el.hidden = false;
       clearTimeout(window.__toastTimer);
-      window.__toastTimer = setTimeout(() => {el.hidden = true;}, 4500);
+      window.__toastTimer = setTimeout(() => {el.hidden = true;}, 4800);
     }
 
     function openDialog(html, wide = false) {
@@ -1702,26 +1803,7 @@
       const defaultStore = getStoresByArea(defaultArea)[0] || "";
 
       if (!AppState.currentUserId) {
-        return {
-          id: "",
-          name: AppState.lineDisplayName || "",
-          role: "newcomer",
-          area: defaultArea,
-          store: defaultStore,
-          gender: "",
-          uniformSize: "",
-          age: "",
-          lineWorksId: "",
-          hiredAt: today(),
-          experience: "developing",
-          active: true,
-          isAdmin: false,
-          isOwner: false,
-          isSuperAdmin: false,
-          trainerEnabled: false,
-          online: true,
-          deletedAt: null
-        };
+        AppState.currentUserId = getOrCreateDeviceUserId();
       }
 
       let p = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
@@ -1757,11 +1839,11 @@
       return p;
     }
 
-    function applyAutoRoleRouting() {
+    function applyAutoRoleRouting(keepCurrentAdminTab = false) {
       if (!AppState.currentUserId) return;
       const existing = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
       if (!existing || existing.active === false) {
-        AppState.role = "newcomer";
+        if (!keepCurrentAdminTab) AppState.role = "newcomer";
         return;
       }
 
@@ -1774,6 +1856,8 @@
       } else if (isTrainer) {
         AppState.isTrainerPinVerified = true;
       }
+
+      if (keepCurrentAdminTab) return;
 
       // TR稼働（兼任含む）がONの人は最初にTR日程提出画面を開く
       if (isTrainer) {
@@ -1791,20 +1875,25 @@
 
     async function promptOwnerElevation() {
       if (!AppState.currentUserId) {
-        AppState.currentUserId = "owner_" + Date.now();
+        AppState.currentUserId = getOrCreateDeviceUserId();
       }
       const me = getCurrentPerson(true);
       if (me.isOwner || me.isSuperAdmin) {
+        saveOwnerSession(me.id, me.name);
         notify("👑 すでにオーナー権限を取得済みです。");
+        render();
         return;
       }
       const pass = prompt("オーナー専用パスワードを入力してください：");
       if (pass === null) return;
       if (pass.trim() !== OWNER_MASTER_PASS) {
-        notify("❌ オーナーパスワードが正しくありません。");
+        notify("❌ オーナーパスワードが正しくありません。", true);
         return;
       }
 
+      if (!me.name) {
+        me.name = AppState.lineDisplayName || "オーナー";
+      }
       me.isOwner = true;
       me.isSuperAdmin = true;
       me.isAdmin = true;
@@ -1814,24 +1903,25 @@
       AppState.isAdminPinVerified = true;
       AppState.isTrainerPinVerified = true;
 
-      addLog(`「${me.name || "オーナー"}」がオーナー認証によりオーナー権限を取得しました`);
+      addLog(`「${me.name}」がオーナー認証によりオーナー権限を取得しました`);
       const res = await syncWithGAS("claimOwner", {
         actorId: me.id,
         ownerPass: pass.trim(),
         state: AppState.state
       });
+
+      if (!res || res.ok === false) {
+        notify("⚠️ スプレッドシートへのオーナー保存に失敗しました: " + (res?.error || "通信エラー"), true);
+        return;
+      }
+
+      saveOwnerSession(me.id, me.name);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.state));
       } catch (e) { }
 
-      if (res && res.ok === false) {
-        notify("⚠️ " + (res.error || "オーナー認証に失敗しました。"));
-        return;
-      }
-
-      applyAutoRoleRouting();
       render();
-      notify("👑 オーナー権限を取得しました！");
+      notify("👑 オーナー権限を取得し、スプレッドシートへ保存しました！");
     }
 
     function storeOptionsHtml(area, selectedStore = "") {
@@ -1842,14 +1932,17 @@
       return stores.map(stName => `<option value="${esc(stName)}" ${stName === selectedStore ? "selected" : ""}>${esc(stName)}</option>`).join("");
     }
 
-    function headerHtml(title) {
+    function headerHtml(title, extraRightHtml = "") {
       return `
         <div class="hero">
           <h1>${esc(title)}</h1>
-          <div class="month-control">
-            <button type="button" data-month="-1" aria-label="前月">‹</button>
-            <strong>${monthLabel(AppState.month)}</strong>
-            <button type="button" data-month="1" aria-label="翌月">›</button>
+          <div class="hero-right">
+            ${extraRightHtml}
+            <div class="month-control">
+              <button type="button" data-month="-1" aria-label="前月">‹</button>
+              <strong>${monthLabel(AppState.month)}</strong>
+              <button type="button" data-month="1" aria-label="翌月">›</button>
+            </div>
           </div>
         </div>
       `;
@@ -2541,7 +2634,7 @@
             <h2>開催候補枠（ランダムペア自動生成 ＆ 手動登録）</h2>
             <button type="button" class="btn" id="btn-add-slot">＋ 手動で日時・TRを登録</button>
           </div>
-          <label class="check"><input type="checkbox" id="chk-training-history" ${AppState.trainingHistory ? "checked" : ""}>取消・削除済みの履歴も表示する</label>
+          <label class="check"><input type="checkbox" id="chk-training-history" ${AppState.trainingHistory ? "checked" : ""}>中止済みの履歴も表示する</label>
           ${visibleSlots.map(slot => slotCardHtml(slot, false, "admin")).join("") || '<div class="empty">開催候補枠がありません。TRが日程を提出するか、手動登録してください。</div>'}
         `;
       } else if (AppState.tab === "availability") {
@@ -2580,8 +2673,9 @@
         `;
       } else if (AppState.tab === "people") {
         const needle = AppState.staffSearch.trim().toLowerCase();
+        // 削除済みスタッフ（deletedAtあり）はスプレッドシート上にデータを残し、管理画面の一覧には表示しない
         const filteredPeople = s.people.filter(p => {
-          if (!!p.deletedAt !== AppState.showDeletedStaff) return false;
+          if (p.deletedAt) return false;
           if (AppState.staffKind === "newcomer" && p.role !== "newcomer") return false;
           if (AppState.staffKind === "trainer" && !isTrainerPerson(p)) return false;
           if (AppState.staffKind === "admin" && !isAdminPerson(p)) return false;
@@ -2597,7 +2691,7 @@
               <button type="button" class="btn" id="btn-add-person">＋ スタッフを登録</button>
             </div>
           </div>
-          <div class="row">
+          <div class="row" style="margin-bottom:14px;">
             <div>
               <label>区分フィルター</label>
               <select id="sel-staff-kind">
@@ -2612,18 +2706,17 @@
               <input type="search" id="inp-staff-search" value="${esc(AppState.staffSearch)}" placeholder="名前・エリア・店舗名で検索">
             </div>
           </div>
-          <label class="check"><input type="checkbox" id="chk-deleted-staff" ${AppState.showDeletedStaff ? "checked" : ""}>削除済みのスタッフを表示する</label>
           <div class="table-wrap">
             <table>
               <thead><tr><th style="width:32px;">選択</th><th>氏名 / LINE連携</th><th>区分 / 権限・ランク</th><th>所属エリア・店舗 / 制服</th><th>状態</th><th>操作</th></tr></thead>
               <tbody>
                 ${filteredPeople.map(p => `
                   <tr>
-                    <td><input type="checkbox" data-select-staff="${p.id}" ${AppState.selectedStaff.has(p.id) ? "checked" : ""} ${p.deletedAt ? "disabled" : ""}></td>
+                    <td><input type="checkbox" data-select-staff="${p.id}" ${AppState.selectedStaff.has(p.id) ? "checked" : ""}></td>
                     <td>
                       <strong>${esc(p.name || "名前未登録")}</strong><br>
                       <span class="pill" style="margin-left:0; background:${String(p.id).startsWith("U") ? "#dcfce7;color:#166534" : "#f1f5f9;color:#64748b"};">
-                        ${String(p.id).startsWith("U") ? "✓ LINE通知連携済" : "手動登録ID"}
+                        ${String(p.id).startsWith("U") ? "✓ LINE通知連携済" : "ブラウザ/手動登録"}
                       </span>
                     </td>
                     <td>
@@ -2634,12 +2727,10 @@
                       <span class="tag tag-${getAreaClass(p.area)}">${esc(p.area || "-")}</span> ${esc(p.store || "")}<br>
                       <span class="hint">${p.role === "newcomer" ? `${esc(p.gender || "-")} / 制服:${esc(p.uniformSize || "-")}` : esc(p.email || "")}</span>
                     </td>
-                    <td>${p.deletedAt ? "削除済み" : p.active ? "有効" : "停止中"}</td>
+                    <td>${p.active ? "有効" : "停止中"}</td>
                     <td>
                       <div class="small-actions">
-                        ${p.deletedAt
-            ? (isOwner ? `<button type="button" class="btn secondary" data-restore-person="${p.id}">復元</button>` : '<span class="hint">削除済</span>')
-            : `<button type="button" class="btn secondary" data-edit-person="${p.id}">編集</button>`}
+                        <button type="button" class="btn secondary" data-edit-person="${p.id}">編集</button>
                       </div>
                     </td>
                   </tr>
@@ -2647,6 +2738,7 @@
               </tbody>
             </table>
           </div>
+          <p class="hint" style="margin-top:10px;">※編集から削除したスタッフは管理画面の一覧から非表示になりますが、スプレッドシート（「スタッフマスタ」・過去履歴）にはデータが残ります。</p>
         `;
       } else if (AppState.tab === "stores") {
         const stores = (s.stores || []).filter(x => !!x.deletedAt === AppState.showDeletedStores);
@@ -2691,8 +2783,8 @@
             </div>
           </div>
           <div class="notice">
-            <strong>新人共有（アプリ版）シート連携：</strong>${sr.enabled !== false ? "🟢 自動連携ON" : "⚪ 停止中"} ／ 最終反映：<strong>${esc(lastSyncLabel)}</strong><br>
-            <span class="hint">※「新人共有（最新）」への誤書き込みを防止し、アプリ版シートの同一新人行へ所属エリア・所属店舗・予約日時・担当TR・現場6日進捗だけを追記更新します（バディ・紹介者名・備考等の手入力列は保持）。<br>※共有シートURLの変更は「⚙️ 各種設定」タブで行えます。</span>
+            <strong>スプレッドシート自動連携：</strong>${sr.enabled !== false ? "🟢 自動連携ON" : "⚪ 停止中"} ／ 最終反映：<strong>${esc(lastSyncLabel)}</strong><br>
+            <span class="hint">※保存・予約・提出のたびにスプレッドシート（「予約・研修進捗一覧」「TR日程提出一覧」「開催候補枠一覧」「スタッフマスタ」）へ自動反映されます。</span>
           </div>
           <h3>通知配信履歴（LINEプッシュ ＆ アプリ内通知）</h3>
           ${(s.messages || []).slice(0, 20).map(m => `
@@ -2735,7 +2827,7 @@
             </div>
           ` : `
             <div class="notice">
-              <strong>🔒 権限制限：</strong>現在「一般管理者」として閲覧中です。PINコードの再設定、データ削除、システムルール変更は<strong>オーナー権限</strong>を持つアカウントのみ実行できます。
+              <strong>🔒 権限制限：</strong>現在「一般管理者」として閲覧中です。PINコードの再設定、データ削除、システムルール変更は<strong>オーナー権限</strong>を持つアカウントのみ実行できます（右上の「👑 オーナー認証」から切替可能）。
             </div>
           `}
 
@@ -2801,16 +2893,20 @@
 
             <label style="margin-top:16px;">新人共有スプレッドシート（アプリ版）URL</label>
             <input type="url" name="sharedRosterUrl" value="${esc(sr.url || "https://docs.google.com/spreadsheets/")}" placeholder="https://docs.google.com/spreadsheets/d/..." ${!isOwner ? "disabled" : ""}>
-            <p class="hint">※予約確定・進捗更新時にGASが「新人共有（アプリ版）」タブへ自動追記する先のスプレッドシートURLです（空欄または初期URLの場合はGAS紐付け先シート内の同タブを使用します）。</p>
+            <p class="hint">※予約確定・進捗更新時にGASが自動追記する先のスプレッドシートURLです。</p>
 
             ${isOwner ? `<button type="submit" class="btn full">各種設定を保存する</button>` : ""}
           </form>
         `;
       }
 
+      const ownerAuthBtnHtml = !isOwner
+        ? `<button type="button" id="btn-claim-owner" class="owner-claim-btn">👑 オーナー認証</button>`
+        : `<span class="tag tag-owner" style="padding:5px 10px;">👑 オーナー認証済</span>`;
+
       return `
         ${alerts.length ? `<div class="error"><strong>⚠️ 運用確認：</strong>${alerts.join(" / ")}</div>` : ""}
-        ${headerHtml("③ 管理者ダッシュボード")}
+        ${headerHtml("③ 管理者ダッシュボード", ownerAuthBtnHtml)}
 
         <!-- 大判タップ可能サマリーカード -->
         <div class="dashboard-tiles">
@@ -2896,7 +2992,7 @@
       if (!slot) return;
 
       if (!person || !person.name || !person.gender || !person.uniformSize || !person.area || !person.store) {
-        notify("⚠️ 予約する前に、上の『新人プロフィール（氏名・所属エリア・所属店舗・性別・制服サイズ）』を保存してください。");
+        notify("⚠️ 予約する前に、上の『新人プロフィール（氏名・所属エリア・所属店舗・性別・制服サイズ）』を保存してください。", true);
         $("#newcomer-profile-section")?.scrollIntoView({behavior: "smooth"});
         return;
       }
@@ -2915,13 +3011,18 @@
           担当TR：${slot.trainerIds.map(id => esc(personName(id))).join(" / ")}
         </div>
         <p class="hint">
-          ${oldBooking ? "同じ月の現在の予約はキャンセルされ、この日時に変更されます。" : "確定すると担当TRと管理者へLINE通知され、新人共有シートへ自動追記されます。"}
+          ${oldBooking ? "同じ月の現在の予約はキャンセルされ、この日時に変更されます。" : "確定すると担当TRと管理者へ通知され、スプレッドシートへ自動保存されます。"}
         </p>
         <button type="button" class="btn full" id="btn-confirm-booking">${oldBooking ? "日程を変更して確定する" : "この内容で予約を確定する"}</button>
         <button type="button" class="text-link" data-close>戻る</button>
       `);
 
       $("#btn-confirm-booking").onclick = async () => {
+        const btn = $("#btn-confirm-booking");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "⏳ スプレッドシートへ保存中...";
+        }
         const recipients = [personId, ...slot.trainerIds];
         if (oldBooking) {
           AppState.state.cancelledBookings.push({...oldBooking, status: "日程変更による取消", cancelledAt: new Date().toISOString()});
@@ -2953,9 +3054,13 @@
             recipients
           );
         }
-        persistLocal(true);
+        const syncRes = await persistLocal(true);
         $("#dialog").close();
-        notify("✅ OFF研修の予約を確定しました！");
+        if (syncRes && syncRes.ok) {
+          notify("✅ OFF研修の予約を確定し、スプレッドシートへ保存しました！");
+        } else {
+          notify("⚠️ 予約は端末に保存されましたが、スプレッドシート同期を確認してください。", true);
+        }
         render();
       };
     }
@@ -3020,12 +3125,12 @@
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
-      $("#slot-edit-form").onsubmit = e => {
+      $("#slot-edit-form").onsubmit = async e => {
         e.preventDefault();
         const f = new FormData(e.target);
         const trainerIds = f.getAll("trainerIds");
         if (trainerIds.length !== 2) {
-          notify("担当TRは2名選択してください。");
+          notify("担当TRは2名選択してください。", true);
           return;
         }
         const date = f.get("date");
@@ -3083,18 +3188,22 @@
           });
           addLog(`手動で研修候補枠（${date} ${start}）を登録しました`);
         }
-        persistLocal(true);
+        const syncRes = await persistLocal(true);
         $("#dialog").close();
-        notify("✅ 研修予定を保存しました。");
+        if (syncRes && syncRes.ok) {
+          notify("✅ 研修予定を保存し、スプレッドシートへ反映しました。");
+        } else {
+          notify("⚠️ スプレッドシートへの保存に失敗しました。", true);
+        }
         render();
       };
 
-      $("#btn-cancel-slot")?.addEventListener("click", () => {
+      $("#btn-cancel-slot")?.addEventListener("click", async () => {
         if (!isOwner) {
-          notify("⚠️ この操作はオーナー権限のみ実行できます。");
+          notify("⚠️ この操作はオーナー権限のみ実行できます。", true);
           return;
         }
-        if (!confirm("この研修全体を取り消しますか？（関係する新人・TRへLINE通知されます）")) return;
+        if (!confirm("この研修全体を取り消しますか？（関係する新人・TRへ通知されます）")) return;
         s.cancelled = true;
         const bookedIds = AppState.state.bookings.filter(b => b.slotId === s.id).map(b => b.personId);
         addLog(
@@ -3104,23 +3213,23 @@
           `${fmt(s.date)} ${s.start} のOFF研修は中止となりました。`,
           [...s.trainerIds, ...bookedIds]
         );
-        persistLocal(true);
+        await persistLocal(true);
         $("#dialog").close();
-        notify("研修を中止しました。");
+        notify("✅ 研修を中止し、スプレッドシートへ反映しました。");
         render();
       });
 
-      $("#btn-hide-slot")?.addEventListener("click", () => {
+      $("#btn-hide-slot")?.addEventListener("click", async () => {
         if (!isOwner) {
-          notify("⚠️ この操作はオーナー権限のみ実行できます。");
+          notify("⚠️ この操作はオーナー権限のみ実行できます。", true);
           return;
         }
         if (!confirm("通常一覧から削除しますか？（履歴データは保持されます）")) return;
         s.deletedAt = new Date().toISOString();
         addLog(`研修枠（${s.date} ${s.start}）を一覧から削除しました（履歴保持）`);
-        persistLocal(true);
+        await persistLocal(true);
         $("#dialog").close();
-        notify("一覧から削除しました（履歴は保持されています）。");
+        notify("✅ 一覧から削除しました（スプレッドシート履歴は保持されています）。");
         render();
       });
     }
@@ -3150,17 +3259,17 @@
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
-      $("#progress-edit-form").onsubmit = e => {
+      $("#progress-edit-form").onsubmit = async e => {
         e.preventDefault();
         const f = new FormData(e.target);
         const days = f.getAll("day").filter(Boolean).sort();
         const status = f.get("status");
         if (new Set(days).size !== days.length) {
-          notify("現場研修の日付が重複しています。");
+          notify("現場研修の日付が重複しています。", true);
           return;
         }
         if (status === "研修終了" && days.length < 6) {
-          notify("「研修終了」にするには現場研修6日分の登録が必要です。");
+          notify("「研修終了」にするには現場研修6日分の登録が必要です。", true);
           return;
         }
         b.status = status;
@@ -3173,9 +3282,13 @@
           `ステータス：${status}\n現場研修記録：${days.length} / 6日（${days.join(", ") || "未入力"}）`,
           [b.personId]
         );
-        persistLocal(true);
+        const syncRes = await persistLocal(true);
         $("#dialog").close();
-        notify("✅ 研修進捗を保存しました。");
+        if (syncRes && syncRes.ok) {
+          notify("✅ 研修進捗を保存し、スプレッドシートへ反映しました。");
+        } else {
+          notify("⚠️ スプレッドシートへの保存に失敗しました。", true);
+        }
         render();
       };
     }
@@ -3206,7 +3319,7 @@
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
-      $("#swap-offer-form").onsubmit = e => {
+      $("#swap-offer-form").onsubmit = async e => {
         e.preventDefault();
         const f = new FormData(e.target);
         const toId = f.get("toId");
@@ -3226,9 +3339,9 @@
           `${me.name}さんから ${fmt(slot.date)} ${slot.start} のOFF研修交代依頼が届いています。アプリから承諾または辞退を選択してください。`,
           [toId]
         );
-        persistLocal(true);
+        await persistLocal(true);
         $("#dialog").close();
-        notify("✅ 交代依頼を送信しました（相手の承諾後に確定します）。");
+        notify("✅ 交代依頼を送信し、スプレッドシートへ保存しました。");
         render();
       };
     }
@@ -3326,7 +3439,7 @@
 
           <button type="submit" class="btn full">保存する</button>
         </form>
-        ${personId && isOwner ? `<button type="button" class="btn danger full" id="btn-delete-person">このスタッフを削除（履歴は保持）</button>` : personId ? '<p class="hint" style="margin-top:10px;">※スタッフの削除はオーナー権限のみ実行できます。</p>' : ""}
+        ${personId && isOwner ? `<button type="button" class="btn danger full" id="btn-delete-person">管理画面から削除する（スプレッドシートのデータは保持）</button>` : personId ? '<p class="hint" style="margin-top:10px;">※スタッフの削除はオーナー権限のみ実行できます。</p>' : ""}
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
@@ -3406,25 +3519,34 @@
         }
 
         rebuildAutoSlots();
-        persistLocal(true);
+        const syncRes = await persistLocal(true);
         $("#dialog").close();
-        notify("✅ スタッフ情報を保存しました。");
+        if (syncRes && syncRes.ok) {
+          notify("✅ スタッフ情報を保存し、スプレッドシートへ反映しました。");
+        } else {
+          notify("⚠️ スプレッドシートへの反映を確認してください。", true);
+        }
         render();
       };
 
-      $("#btn-delete-person")?.addEventListener("click", () => {
+      $("#btn-delete-person")?.addEventListener("click", async () => {
         if (!isOwner) {
-          notify("⚠️ スタッフの削除はオーナー権限のみ実行できます。");
+          notify("⚠️ スタッフの削除はオーナー権限のみ実行できます。", true);
           return;
         }
-        if (!confirm(`「${p.name}」を削除しますか？（過去の研修履歴は保持され、後から復元できます）`)) return;
+        if (!confirm(`「${p.name}」を管理画面から削除しますか？\n（スプレッドシートの「スタッフマスタ」や過去の研修履歴データはそのまま残ります）`)) return;
         p.deletedAt = new Date().toISOString();
         p.active = false;
-        addLog(`スタッフ「${p.name}」を削除しました（履歴保持）`);
+        AppState.selectedStaff.delete(p.id);
+        addLog(`スタッフ「${p.name}」を管理画面から削除しました（スプレッドシートデータは保持）`);
         rebuildAutoSlots();
-        persistLocal(true);
+        const syncRes = await persistLocal(true);
         $("#dialog").close();
-        notify("スタッフを削除しました。");
+        if (syncRes && syncRes.ok) {
+          notify("✅ 管理画面から削除しました（スプレッドシートのデータは保持されています）。");
+        } else {
+          notify("⚠️ 削除の同期を確認してください。", true);
+        }
         render();
       });
     }
@@ -3433,7 +3555,7 @@
       const isOwner = isOwnerUser();
       const ids = Array.from(AppState.selectedStaff).filter(id => AppState.state.people.some(p => p.id === id && !p.deletedAt));
       if (ids.length === 0) {
-        notify("一括編集するスタッフにチェックを入れてください。");
+        notify("一括編集するスタッフにチェックを入れてください。", true);
         return;
       }
       const areas = getAvailableAreas();
@@ -3481,7 +3603,7 @@
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
-      $("#bulk-staff-edit-form").onsubmit = e => {
+      $("#bulk-staff-edit-form").onsubmit = async e => {
         e.preventDefault();
         const f = new FormData(e.target);
         ids.forEach(id => {
@@ -3500,9 +3622,13 @@
         addLog(`スタッフ${ids.length}名を一括編集しました`);
         AppState.selectedStaff.clear();
         rebuildAutoSlots();
-        persistLocal(true);
+        const syncRes = await persistLocal(true);
         $("#dialog").close();
-        notify(`✅ ${ids.length}名のスタッフ情報を一括更新しました。`);
+        if (syncRes && syncRes.ok) {
+          notify(`✅ ${ids.length}名のスタッフ情報を一括更新し、スプレッドシートへ反映しました。`);
+        } else {
+          notify("⚠️ 一括更新の保存を確認してください。", true);
+        }
         render();
       };
     }
@@ -3527,7 +3653,7 @@
         <button type="button" class="text-link" data-close>閉じる</button>
       `);
 
-      $("#store-edit-form").onsubmit = e => {
+      $("#store-edit-form").onsubmit = async e => {
         e.preventDefault();
         const f = new FormData(e.target);
         if (storeId) {
@@ -3543,29 +3669,33 @@
             deletedAt: null
           });
         }
-        persistLocal(true);
+        const syncRes = await persistLocal(true);
         $("#dialog").close();
-        notify("✅ 店舗情報を保存しました。");
+        if (syncRes && syncRes.ok) {
+          notify("✅ 店舗情報を保存し、スプレッドシートへ反映しました。");
+        } else {
+          notify("⚠️ 店舗保存の同期を確認してください。", true);
+        }
         render();
       };
 
-      $("#btn-delete-store")?.addEventListener("click", () => {
+      $("#btn-delete-store")?.addEventListener("click", async () => {
         if (!isOwner) {
-          notify("⚠️ 店舗の削除はオーナー権限のみ実行できます。");
+          notify("⚠️ 店舗の削除はオーナー権限のみ実行できます。", true);
           return;
         }
         if (!confirm(`店舗「${st.name}」を削除しますか？（所属スタッフと履歴は保持されます）`)) return;
         st.deletedAt = new Date().toISOString();
-        persistLocal(true);
+        await persistLocal(true);
         $("#dialog").close();
-        notify("店舗を削除しました。");
+        notify("✅ 店舗を削除し、スプレッドシートへ反映しました。");
         render();
       });
     }
 
     function openCleanupPreviewModal() {
       if (!isOwnerUser()) {
-        notify("⚠️ この操作はオーナー権限のみ実行できます。");
+        notify("⚠️ この操作はオーナー権限のみ実行できます。", true);
         return;
       }
       const cutoffDate = new Date();
@@ -3608,7 +3738,7 @@
             btn.disabled = false;
             btn.textContent = "スプレッドシートへ履歴退避してクリーニング実行";
           }
-          notify("⚠️ スプレッドシートへの退避に失敗したため、データ保護のため削除を中止しました。");
+          notify("⚠️ スプレッドシートへの退避に失敗したため、データ保護のため削除を中止しました。", true);
           return;
         }
 
@@ -3662,7 +3792,8 @@
     // ==================== メイン描画オーケストレーター ====================
     function render() {
       const me = getCurrentPerson();
-      const roleLabel = (me.isOwner || me.isSuperAdmin)
+      const isOwner = isOwnerUser(me);
+      const roleLabel = isOwner
         ? "👑オーナー"
         : isAdminPerson(me)
           ? "管理者"
@@ -3670,11 +3801,6 @@
             ? `TR（${me.area || "金山"}）`
             : `${me.area || "金山"}`;
       $("#header-user-badge").textContent = `👤 ${me.name || AppState.lineDisplayName || "ゲスト"}（${roleLabel}）`;
-
-      const claimBtn = $("#btn-claim-owner");
-      if (claimBtn) {
-        claimBtn.hidden = !!(me.isOwner || me.isSuperAdmin);
-      }
 
       document.querySelectorAll("[data-role]").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.role === AppState.role);
@@ -3694,24 +3820,24 @@
     async function switchRoleWithPinCheck(nextRole) {
       const me = getCurrentPerson();
 
-      if (nextRole === "trainer" && !AppState.isTrainerPinVerified && !isTrainerPerson(me) && !isAdminPerson(me)) {
+      if (nextRole === "trainer" && !AppState.isTrainerPinVerified && !isTrainerPerson(me) && !isAdminPerson(me) && !isOwnerUser(me)) {
         const expectedTrPin = AppState.state.config.trainerPin || DEFAULT_TRAINER_PIN;
         const input = prompt("② TR日程提出ページ用のPINコードを入力してください:");
         if (input === null) return;
         if (input !== expectedTrPin) {
-          notify("⚠️ TRページ用PINコードが正しくありません。");
+          notify("⚠️ TRページ用PINコードが正しくありません。", true);
           return;
         }
         AppState.isTrainerPinVerified = true;
         notify("✅ TRページの認証に成功しました。");
       }
 
-      if (nextRole === "admin" && !AppState.isAdminPinVerified && !isAdminPerson(me)) {
+      if (nextRole === "admin" && !AppState.isAdminPinVerified && !isAdminPerson(me) && !isOwnerUser(me)) {
         const expectedAdminPin = AppState.state.config.adminPin || AppState.state.config.pin || DEFAULT_ADMIN_PIN;
         const input = prompt("③ 管理画面用のPINコードを入力してください:");
         if (input === null) return;
         if (input !== expectedAdminPin) {
-          notify("⚠️ 管理画面用PINコードが正しくありません。");
+          notify("⚠️ 管理画面用PINコードが正しくありません。", true);
           return;
         }
         AppState.isAdminPinVerified = true;
@@ -3739,11 +3865,9 @@
         btn.addEventListener("click", () => switchRoleWithPinCheck(btn.dataset.role));
       });
 
-      $("#btn-claim-owner")?.addEventListener("click", () => promptOwnerElevation());
-
       $("#reload-data").addEventListener("click", async () => {
         await fetchLatestFromGAS(false);
-        applyAutoRoleRouting();
+        applyAutoRoleRouting(AppState.role === "admin");
         render();
         notify("✅ 最新の状態に更新しました。");
       });
@@ -3771,6 +3895,11 @@
       document.addEventListener("click", async e => {
         const target = e.target.closest("button, [data-tr-cal-date], [data-admin-cal-date]");
         if (!target) return;
+
+        if (target.id === "btn-claim-owner") {
+          await promptOwnerElevation();
+          return;
+        }
 
         if (target.dataset.switchStaffRole) {
           await switchRoleWithPinCheck(target.dataset.switchStaffRole);
@@ -3852,10 +3981,13 @@
           const me = getCurrentPerson(true);
           const c = operatingOf();
           if (c.isLocked || isSubmissionPeriodExpired(AppState.month, AppState.workflowHalf, c)) {
-            notify("提出期限が終了しているかロック中のため保存できません。");
+            notify("提出期限が終了しているかロック中のため保存できません。", true);
             render();
             return;
           }
+          target.disabled = true;
+          target.textContent = "⏳ スプレッドシートへ提出データを保存中...";
+
           const entries = Object.entries(AppState.draftCalendarMap)
             .filter(([, val]) => val.selected)
             .map(([date, val]) => ({
@@ -3893,9 +4025,14 @@
             `${me.name || "TR"}さんが ${entries.length}日分の出勤可能日を提出しました（ペア成立枠：${matchedCount}件）。`,
             []
           );
-          persistLocal(true);
-          AppState.trSaveFeedback = `提出完了！（${nowTimeStr()} 保存 ／ ${entries.length}日分を反映・ペア成立枠 ${matchedCount}件）`;
-          notify("✅ 提出が完了し、開催候補枠へ自動反映されました！");
+          const syncRes = await persistLocal(true);
+          if (syncRes && syncRes.ok) {
+            AppState.trSaveFeedback = `提出完了！（${nowTimeStr()} スプレッドシート反映済 ／ ${entries.length}日分を反映・ペア成立枠 ${matchedCount}件）`;
+            notify("✅ 提出が完了し、スプレッドシートと開催候補枠へ反映されました！");
+          } else {
+            AppState.trSaveFeedback = `端末に保存しました（${nowTimeStr()} ／ スプレッドシート再同期をお試しください）`;
+            notify("⚠️ スプレッドシートへの送信でエラーが発生しました。", true);
+          }
           render();
           return;
         }
@@ -3921,7 +4058,8 @@
               `${personName(swap.fromId)}さんから${personName(swap.toId)}さんへの交代が確定しました。`,
               [swap.fromId, swap.toId]
             );
-            notify("✅ 交代を承諾し、担当TRを更新しました。");
+            await persistLocal(true);
+            notify("✅ 交代を承諾し、担当TRを更新・保存しました。");
           } else if (ans === "decline") {
             swap.status = "declined";
             addLog(
@@ -3931,12 +4069,13 @@
               `${personName(swap.toId)}さんが交代依頼を辞退しました。別TRへの再依頼または管理者調整をお願いします。`,
               [swap.fromId]
             );
+            await persistLocal(true);
             notify("交代依頼を辞退しました。");
           } else if (ans === "cancel") {
             swap.status = "cancelled";
+            await persistLocal(true);
             notify("交代依頼を取り消しました。");
           }
-          persistLocal(true);
           render();
           return;
         }
@@ -3970,7 +4109,7 @@
         }
         if (target.dataset.cancelBooking) {
           if (!isOwnerUser()) {
-            notify("⚠️ 予約の取消はオーナー権限のみ実行できます。");
+            notify("⚠️ 予約の取消はオーナー権限のみ実行できます。", true);
             return;
           }
           const idx = AppState.state.bookings.findIndex(b => b.id === target.dataset.cancelBooking);
@@ -3978,8 +4117,8 @@
             const removed = AppState.state.bookings.splice(idx, 1)[0];
             AppState.state.cancelledBookings.push({...removed, status: "オーナーにより予約取消", cancelledAt: new Date().toISOString()});
             addLog(`${personName(removed.personId)}さんのOFF研修予約を取り消しました`);
-            persistLocal(true);
-            notify("予約を取り消しました。");
+            await persistLocal(true);
+            notify("✅ 予約を取り消し、スプレッドシートへ反映しました。");
             render();
           }
           return;
@@ -3990,23 +4129,6 @@
         }
         if (target.dataset.editPerson) {
           openPersonFormModal(target.dataset.editPerson);
-          return;
-        }
-        if (target.dataset.restorePerson) {
-          if (!isOwnerUser()) {
-            notify("⚠️ スタッフの復元はオーナー権限のみ実行できます。");
-            return;
-          }
-          const p = AppState.state.people.find(x => x.id === target.dataset.restorePerson);
-          if (p) {
-            p.deletedAt = null;
-            p.active = true;
-            addLog(`スタッフ「${p.name}」を復元しました`);
-            rebuildAutoSlots();
-            persistLocal(true);
-            notify("✅ スタッフを復元しました。");
-            render();
-          }
           return;
         }
         if (target.id === "btn-bulk-staff") {
@@ -4023,32 +4145,32 @@
         }
         if (target.dataset.restoreStore) {
           if (!isOwnerUser()) {
-            notify("⚠️ 店舗の復元はオーナー権限のみ実行できます。");
+            notify("⚠️ 店舗の復元はオーナー権限のみ実行できます。", true);
             return;
           }
           const st = AppState.state.stores.find(x => x.id === target.dataset.restoreStore);
           if (st) {
             st.deletedAt = null;
             st.active = true;
-            persistLocal(true);
-            notify("✅ 店舗を復元しました。");
+            await persistLocal(true);
+            notify("✅ 店舗を復元し、スプレッドシートへ反映しました。");
             render();
           }
           return;
         }
         if (target.id === "btn-resync-sheet") {
           target.disabled = true;
-          target.textContent = "⏳ 共有表へ反映中...";
+          target.textContent = "⏳ スプレッドシートへ反映中...";
           const res = await syncWithGAS("resyncRoster", {state: AppState.state});
           target.disabled = false;
           target.textContent = "🔄 共有表を再反映";
           if (res && res.ok) {
             const info = res.roster || {};
-            addLog(`新人共有スプレッドシート（アプリ版）へ再反映しました（更新:${info.updated || 0}件 / 新規:${info.appended || 0}件）`);
+            addLog(`スプレッドシートへ全データを再反映しました（予約:${info.updated || 0}件）`);
             await persistLocal(true);
-            notify(`✅ 共有表への書き込みが完了しました（更新:${info.updated || 0}件 / 新規:${info.appended || 0}件）`);
+            notify(`✅ スプレッドシートへの書き込みが完了しました（予約:${info.updated || 0}件）`);
           } else {
-            notify("⚠️ 共有表への反映に失敗しました。GASの権限設定を確認してください。");
+            notify("⚠️ スプレッドシートへの反映に失敗しました: " + (res?.error || "GAS設定を確認してください"), true);
           }
           render();
           return;
@@ -4066,9 +4188,14 @@
       document.addEventListener("submit", async e => {
         if (e.target.id === "newcomer-profile-form") {
           e.preventDefault();
+          const submitBtn = e.target.querySelector('button[type="submit"]');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "⏳ スプレッドシートへ保存中...";
+          }
           const f = new FormData(e.target);
           if (!AppState.currentUserId) {
-            AppState.currentUserId = "guest_" + Date.now();
+            AppState.currentUserId = getOrCreateDeviceUserId();
           }
           const me = getCurrentPerson(true);
           me.name = f.get("name").trim();
@@ -4082,56 +4209,74 @@
             me.role = "newcomer";
           }
 
-          AppState.newcomerSaveFeedback = `保存完了！（${nowTimeStr()} ／ ${me.name}・${me.area}（${me.store}）・制服${me.uniformSize}）`;
           addLog(`新人「${me.name}」のプロフィール（${me.area} / ${me.store} / 制服:${me.uniformSize}）を保存しました`);
-          persistLocal(true);
-          notify("✅ 保存完了！下の候補日から予約してください。");
+          const syncRes = await persistLocal(true);
+          if (syncRes && syncRes.ok) {
+            AppState.newcomerSaveFeedback = `保存完了！（${nowTimeStr()} スプレッドシート反映済 ／ ${me.name}・${me.area}（${me.store}）・制服${me.uniformSize}）`;
+            notify("✅ 保存完了！スプレッドシートへ反映しました。下の候補日から予約してください。");
+          } else {
+            AppState.newcomerSaveFeedback = `端末に保存しました（${nowTimeStr()} ／ ${me.name}・${me.area}（${me.store}）・制服${me.uniformSize}）`;
+            notify("⚠️ 端末に保存しましたが、スプレッドシート同期を確認してください。", true);
+          }
           render();
           $("#newcomer-save-banner")?.scrollIntoView({behavior: "smooth", block: "nearest"});
         } else if (e.target.id === "tr-profile-form") {
           e.preventDefault();
+          const submitBtn = e.target.querySelector('button[type="submit"]');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "⏳ 保存中...";
+          }
           const f = new FormData(e.target);
           if (!AppState.currentUserId) {
-            AppState.currentUserId = "tr_" + Date.now();
+            AppState.currentUserId = getOrCreateDeviceUserId();
           }
           const me = getCurrentPerson(true);
           me.name = f.get("name").trim();
           me.area = f.get("area");
           me.store = f.get("store") || "";
           if (me.role === "newcomer") me.role = "trainer";
-          persistLocal(true);
-          notify("✅ TRプロフィールを保存しました。");
+          const syncRes = await persistLocal(true);
+          if (syncRes && syncRes.ok) {
+            notify("✅ TRプロフィールを保存し、スプレッドシートへ反映しました。");
+          } else {
+            notify("⚠️ スプレッドシートへの保存を確認してください。", true);
+          }
           render();
         } else if (e.target.id === "pin-update-form") {
           e.preventDefault();
           if (!isOwnerUser()) {
-            notify("⚠️ PINコードの変更はオーナー権限のみ実行できます。");
+            notify("⚠️ PINコードの変更はオーナー権限のみ実行できます。", true);
             return;
           }
           const f = new FormData(e.target);
           const nextTrainerPin = String(f.get("trainerPin") || "").trim();
           const nextAdminPin = String(f.get("adminPin") || "").trim();
           if (nextTrainerPin.length < 4 || nextAdminPin.length < 4) {
-            notify("⚠️ PINコードは4文字以上で設定してください。");
+            notify("⚠️ PINコードは4文字以上で設定してください。", true);
             return;
           }
           AppState.state.config.trainerPin = nextTrainerPin;
           AppState.state.config.adminPin = nextAdminPin;
           AppState.state.config.pin = nextAdminPin;
           addLog(`オーナー（${getCurrentPerson().name}）がTR用PIN・管理者用PINを再設定しました`);
-          persistLocal(true);
-          notify("✅ TRページ用PIN・管理画面用PINを再設定しました。");
+          const syncRes = await persistLocal(true);
+          if (syncRes && syncRes.ok) {
+            notify("✅ TRページ用PIN・管理画面用PINを再設定し、スプレッドシートへ保存しました。");
+          } else {
+            notify("⚠️ PINコードの保存を確認してください。", true);
+          }
           render();
         } else if (e.target.id === "admin-operating-form") {
           e.preventDefault();
           if (!isOwnerUser()) {
-            notify("⚠️ 運用ルールの変更はオーナー権限のみ実行できます。");
+            notify("⚠️ 運用ルールの変更はオーナー権限のみ実行できます。", true);
             return;
           }
           const f = new FormData(e.target);
           const pickedStarts = f.getAll("starts");
           if (pickedStarts.length === 0) {
-            notify("⚠️ 開始時間は最低1つ以上選択してください。");
+            notify("⚠️ 開始時間は最低1つ以上選択してください。", true);
             return;
           }
           const op = AppState.state.config.operating;
@@ -4153,8 +4298,12 @@
 
           rebuildAutoSlots();
           addLog("オーナーにより各種運用設定（提出期限・開始時間・会議室・予約締切・共有シートURL）が更新されました");
-          persistLocal(true);
-          notify("✅ 各種設定を保存し、TR提出・予約枠・共有表連携へ反映しました。");
+          const syncRes = await persistLocal(true);
+          if (syncRes && syncRes.ok) {
+            notify("✅ 各種設定を保存し、スプレッドシートへ反映しました。");
+          } else {
+            notify("⚠️ 設定の保存を確認してください。", true);
+          }
           render();
         }
       });
@@ -4181,9 +4330,6 @@
         } else if (t.id === "sel-staff-kind") {
           AppState.staffKind = t.value;
           render();
-        } else if (t.id === "chk-deleted-staff") {
-          AppState.showDeletedStaff = t.checked;
-          render();
         } else if (t.id === "chk-deleted-stores") {
           AppState.showDeletedStores = t.checked;
           render();
@@ -4193,12 +4339,12 @@
         } else if (t.id === "chk-lock-submission") {
           if (!isOwnerUser()) {
             t.checked = !t.checked;
-            notify("⚠️ 提出ロックの切り替えはオーナー権限のみ実行できます。");
+            notify("⚠️ 提出ロックの切り替えはオーナー権限のみ実行できます。", true);
             return;
           }
           AppState.state.config.operating.isLocked = t.checked;
           addLog(`オーナーによりTR提出ロックが「${t.checked ? "ON（締切）" : "OFF（受付中）"}」に変更されました`);
-          persistLocal(true);
+          await persistLocal(true);
           notify(t.checked ? "🔒 TRの提出をロックしました。" : "🔓 TRの提出ロックを解除しました。");
           render();
         }
@@ -4229,8 +4375,12 @@
           if (window.liff && MY_LIFF_ID) {
             await liff.init({liffId: MY_LIFF_ID});
             if (!IS_DEV_MODE && !liff.isLoggedIn()) {
-              liff.login();
-              return;
+              // 外部ブラウザで既にオーナー認証済みの場合はLIFFリダイレクトをスキップ可能にする
+              const savedOwner = getSavedOwnerSession();
+              if (!savedOwner || !savedOwner.verified) {
+                liff.login();
+                return;
+              }
             }
             if (liff.isLoggedIn()) {
               const profile = await liff.getProfile();
@@ -4249,7 +4399,7 @@
           const existing = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
           if (existing && !existing.name && AppState.lineDisplayName) {
             existing.name = AppState.lineDisplayName;
-            persistLocal(true);
+            await persistLocal(true);
           }
           applyAutoRoleRouting();
         }
