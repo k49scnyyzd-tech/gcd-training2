@@ -1684,9 +1684,6 @@
       });
     }
 
-    /**
-     * 現在のログインユーザーのレコードを取得（LINE ID未取得時は名簿にゴミデータを作らない）
-     */
     function getCurrentPerson(createIfMissing = false) {
       const defaultArea = "金山";
       const defaultStore = getStoresByArea(defaultArea)[0] || "";
@@ -1749,14 +1746,10 @@
       return p;
     }
 
-    /**
-     * LINEログイン後にロールを自動判定し、TR・管理者は専用画面へ直接振り分ける
-     */
     function applyAutoRoleRouting() {
       if (!AppState.currentUserId) return;
       const existing = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
       if (!existing) {
-        // 名簿に未登録のLINE IDは新人としてそのまま新人予約画面へ
         return;
       }
 
@@ -4058,7 +4051,6 @@
       document.addEventListener("change", async e => {
         const t = e.target;
 
-        // 所属エリア変更時に連動する所属店舗プルダウンを即座に更新
         if (t.dataset && t.dataset.areaSelect) {
           const storeSelect = document.getElementById(t.dataset.areaSelect);
           if (storeSelect) {
@@ -4118,7 +4110,6 @@
         window.__eventsBound = true;
       }
 
-      // LINEログイン・名簿照合を優先して実行し、TR・管理者は即座に専用画面へ振り分ける
       (async () => {
         try {
           if (window.liff && MY_LIFF_ID) {
@@ -4137,7 +4128,6 @@
           console.warn("LIFF初期化スキップ:", err);
         }
 
-        // GASから最新の名簿データを取得してからロール判定を実行
         await fetchLatestFromGAS(true);
 
         if (AppState.currentUserId) {
