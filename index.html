@@ -4301,7 +4301,7 @@
             return;
           }
 
-          // 操作者自身がスタッフマスタ上で確実にオーナーになっていることを保証
+        // 操作者自身がスタッフマスタ上で確実にオーナーになっていることを保証
           const me = getCurrentPerson(true);
           me.isOwner = true;
           me.isSuperAdmin = true;
@@ -4327,6 +4327,9 @@
             notify("⚠️ 運用ルールの変更はオーナー権限のみ実行できます。", true);
             return;
           }
+          if (!confirm('設定を保存しますか？（提出期日を変更した場合は、全TRにLINEで変更通知が送信されます）')) {
+            return;
+          }
           const submitBtn = e.target.querySelector('button[type="submit"]');
           if (submitBtn) {
             submitBtn.disabled = true;
@@ -4342,21 +4345,14 @@
             notify("⚠️ 開始時間は最低1つ以上選択してください。", true);
             return;
           }
-// ▼ ここに確認ダイアログを追加 ▼
-          if (!confirm('設定を保存しますか？（提出期日を変更した場合は、全TRにLINEで変更通知が送信されます）')) {
-            return;
-          }
-          // ▲ ここまで ▲
 
-          // 操作者自身がスタッフマスタ上で確実にオーナーになっていることを保証
-          const me = getCurrentPerson(true);
-          me.isOwner = true;
-         
-          me.isOwner = true;
-          me.isSuperAdmin = true;
-          me.isAdmin = true;
-          if (!me.name) me.name = AppState.lineDisplayName || "オーナー";
-          saveOwnerSession(me.id, me.name);
+          // 操作者自身がスタッフマスタ上で確実にオーナーになっていることを保証（2回目は const を外す）
+          const meOp = getCurrentPerson(true);
+          meOp.isOwner = true;
+          meOp.isSuperAdmin = true;
+          meOp.isAdmin = true;
+          if (!meOp.name) meOp.name = AppState.lineDisplayName || "オーナー";
+          saveOwnerSession(meOp.id, meOp.name);
 
           if (!AppState.state.config.operating) {
             AppState.state.config.operating = operatingDefaults();
@@ -4377,7 +4373,6 @@
             AppState.state.config.sharedRoster = {enabled: true, url: "", pending: 0, failed: 0, lastSuccessAt: ""};
           }
           AppState.state.config.sharedRoster.url = rosterUrl || "https://docs.google.com/spreadsheets/";
-
           // 変更後の提出期限に基づき、現在日時から最も期限が近い受付中フェーズへ自動切替
           const nextOpen = detectNextOpenPeriod(op);
           AppState.month = nextOpen.month;
