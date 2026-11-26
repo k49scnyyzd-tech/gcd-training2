@@ -4163,6 +4163,71 @@
     }
 
     document.addEventListener("DOMContentLoaded", initApp);
+    async function initApp() {
+      // 1. まず手元のキャッシュデータで0.1秒で画面を即時表示する
+      loadCachedStateFast();
+      const nextOpen = detectNextOpenPeriod(operatingOf());
+      AppState.workflowHalf = nextOpen.half;
+      if (!window.__eventsBound) {
+        bindGlobalEvents();
+        window.__eventsBound = true;
+      }
+      render();
+
+      // 2. 裏側（バックグラウンド）でLINEログイン確認とスプレッドシート最新同期を実行
+      (async () => {
+        try {
+          if (window.liff && MY_LIFF_ID) {
+            await liff.init({ liffId: MY_LIFF_ID });
+            if (!IS_DEV_MODE && !liff.isLoggedIn()) {
+              liff.login();
+              return;
+            }
+            if (liff.isLoggedIn()) {
+              const profile = await liff.getProfile();
+              AppState.currentUserId = profile.userId;
+              AppState.lineDisplayName = profile.displayName || "";
+            }
+          }
+        } catch (err) {
+          console.warn("LIFF初期化スキップ:", err);
+        }
+
+        // GASから最新の名簿データを取得してからロール判定を実行
+        await fetchLatestFromGAS(true);
+
+        if (AppState.currentUserId) {
+          const existing = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
+          if (existing && !existing.name && AppState.lineDisplayName) {
+            existing.name = AppState.lineDisplayName;
+            persistLocal(true);
+          }
+          applyAutoRoleRouting();
+        }
+
+        AppState.isInitialAuthChecking = false;
+        render();
+      })();
+
+      // 3. 30秒ごとのバックグラウンド自動同期（他端末の予約・TR提出を自動反映）
+      if (!window.__bgSyncStarted) {
+        window.__bgSyncStarted = true;
+        setInterval(async () => {
+          if (document.hidden) return;
+          const dlg = $("#dialog");
+          const timeModal = $("#timeSelectModal");
+          if ((dlg && dlg.open) || (timeModal && timeModal.open)) return;
+
+          const updated = await fetchLatestFromGAS(true);
+          if (updated) {
+            if (AppState.role === "trainer" && Object.keys(AppState.draftCalendarMap).length === 0) {
+              syncDraftCalendarFromState();
+            }
+            render();
+          }
+        }, 30000);
+      }
+    }
   </script>
 </body>
 
