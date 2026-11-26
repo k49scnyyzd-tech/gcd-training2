@@ -4342,7 +4342,15 @@
             notify("⚠️ 開始時間は最低1つ以上選択してください。", true);
             return;
           }
+// ▼ ここに確認ダイアログを追加 ▼
+          if (!confirm('設定を保存しますか？（提出期日を変更した場合は、全TRにLINEで変更通知が送信されます）')) {
+            return;
+          }
+          // ▲ ここまで ▲
 
+          // 操作者自身がスタッフマスタ上で確実にオーナーになっていることを保証
+          const me = getCurrentPerson(true);
+          me.isOwner = true;
           // 操作者自身がスタッフマスタ上で確実にオーナーになっていることを保証
           const me = getCurrentPerson(true);
           me.isOwner = true;
