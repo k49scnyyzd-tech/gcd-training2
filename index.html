@@ -168,6 +168,20 @@
       font-weight: 700;
     }
 
+    .owner-claim-btn {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      color: #b45309;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .owner-claim-btn:hover {
+      background: #fef3c7;
+    }
+
     .layout {
       max-width: 1280px;
       margin: auto;
@@ -1098,7 +1112,8 @@
     <div class="top-actions">
       <span id="header-user-badge" class="user-pill">読込中...</span>
       <span id="live-sync-badge" class="sync-pill">同期確認中...</span>
-      <button id="reload-data" class="text-link">最新情報に更新</button>
+      <button type="button" id="btn-claim-owner" class="owner-claim-btn">👑 オーナー認証</button>
+      <button type="button" id="reload-data" class="text-link">最新情報に更新</button>
     </div>
   </header>
 
@@ -1120,7 +1135,7 @@
   <!-- 汎用モーダルダイアログ -->
   <dialog id="dialog"></dialog>
 
-  <!-- TR時間帯指定モーダルダイアログ（各種設定の開始時間と連動） -->
+  <!-- TR時間帯指定モーダルダイアログ -->
   <dialog id="timeSelectModal">
     <h2 id="modalDateTitle">対応可能時間帯の指定</h2>
     <p class="hint">特定の開始時間のみ対応可能な場合はチェックを入れてください。<br>チェックなしで「確定」すると<strong>終日可（有効な全時間帯対応可）</strong>になります。</p>
@@ -1144,6 +1159,7 @@
     const VENUE_MAP_URL = "https://x.gd/FFibO";
     const DEFAULT_ADMIN_PIN = "123123";
     const DEFAULT_TRAINER_PIN = "123123";
+    const OWNER_MASTER_PASS = "gcd2026";
     const STORAGE_KEY = "gcd_merged_training_state_v2";
 
     const DEFAULT_AREAS = ["金山", "名駅", "栄", "桜山", "今池", "伏見", "錦"];
@@ -1369,7 +1385,7 @@
 
     // ==================== JS: CORE LOGIC & AUTO-MATCHING ENGINE ====================
     function isTrainerPerson(p) {
-      return !!p && (p.role === "trainer" || (p.role === "admin" && p.trainerEnabled === true));
+      return !!p && (p.role === "trainer" || p.trainerEnabled === true);
     }
 
     function isAdminPerson(p) {
@@ -1378,10 +1394,7 @@
 
     function isOwnerUser(p = getCurrentPerson()) {
       if (!p) return false;
-      if (p.isOwner === true || p.isSuperAdmin === true) return true;
-      const hasAnyOwner = (AppState.state?.people || []).some(x => (x.isOwner === true || x.isSuperAdmin === true) && !x.deletedAt);
-      if (!hasAnyOwner && (p.isAdmin || p.role === "admin")) return true;
-      return false;
+      return p.isOwner === true || p.isSuperAdmin === true;
     }
 
     function operatingOf(s = AppState.state) {
@@ -1571,10 +1584,10 @@
       }
       clearTimeout(__syncDebounceTimer);
       if (immediate) {
-        return syncWithGAS("syncAll", {state: AppState.state});
+        return syncWithGAS("syncAll", {actorId: AppState.currentUserId, state: AppState.state});
       } else {
         __syncDebounceTimer = setTimeout(() => {
-          syncWithGAS("syncAll", {state: AppState.state});
+          syncWithGAS("syncAll", {actorId: AppState.currentUserId, state: AppState.state});
         }, 350);
         return Promise.resolve(null);
       }
@@ -1587,7 +1600,7 @@
         const res = await fetch(GAS_API_URL, {
           method: "POST",
           headers: {"Content-Type": "text/plain"},
-          body: JSON.stringify({action, ...payload})
+          body: JSON.stringify({action, actorId: AppState.currentUserId, ...payload})
         });
         const stamp = nowTimeStr();
         if (res.ok) {
@@ -1717,12 +1730,10 @@
         if (deletedRecord && !createIfMissing) {
           return deletedRecord;
         }
-        const activeCount = AppState.state.people.filter(x => !x.deletedAt).length;
-        const isFirstUser = activeCount === 0;
         p = {
           id: AppState.currentUserId,
           name: AppState.lineDisplayName || "",
-          role: isFirstUser ? "admin" : "newcomer",
+          role: "newcomer",
           area: defaultArea,
           store: defaultStore,
           gender: "",
@@ -1730,16 +1741,16 @@
           age: "",
           lineWorksId: "",
           hiredAt: today(),
-          experience: isFirstUser ? "veteran" : "developing",
+          experience: "developing",
           active: true,
-          isAdmin: isFirstUser,
-          isOwner: isFirstUser,
-          isSuperAdmin: isFirstUser,
-          trainerEnabled: isFirstUser,
+          isAdmin: false,
+          isOwner: false,
+          isSuperAdmin: false,
+          trainerEnabled: false,
           online: true,
           deletedAt: null
         };
-        if (createIfMissing || isFirstUser) {
+        if (createIfMissing) {
           AppState.state.people.push(p);
         }
       }
@@ -1749,25 +1760,78 @@
     function applyAutoRoleRouting() {
       if (!AppState.currentUserId) return;
       const existing = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
-      if (!existing) {
+      if (!existing || existing.active === false) {
+        AppState.role = "newcomer";
         return;
       }
 
-      if (isAdminPerson(existing)) {
+      const isAdmin = isAdminPerson(existing);
+      const isTrainer = isTrainerPerson(existing);
+
+      if (isAdmin) {
         AppState.isAdminPinVerified = true;
         AppState.isTrainerPinVerified = true;
-        AppState.role = "admin";
-        return;
+      } else if (isTrainer) {
+        AppState.isTrainerPinVerified = true;
       }
 
-      if (isTrainerPerson(existing)) {
-        AppState.isTrainerPinVerified = true;
+      // TR稼働（兼任含む）がONの人は最初にTR日程提出画面を開く
+      if (isTrainer) {
         AppState.role = "trainer";
         const nextOpen = detectNextOpenPeriod(operatingOf());
         AppState.month = nextOpen.month;
         AppState.workflowHalf = nextOpen.half;
         syncDraftCalendarFromState();
+      } else if (isAdmin) {
+        AppState.role = "admin";
+      } else {
+        AppState.role = "newcomer";
       }
+    }
+
+    async function promptOwnerElevation() {
+      if (!AppState.currentUserId) {
+        AppState.currentUserId = "owner_" + Date.now();
+      }
+      const me = getCurrentPerson(true);
+      if (me.isOwner || me.isSuperAdmin) {
+        notify("👑 すでにオーナー権限を取得済みです。");
+        return;
+      }
+      const pass = prompt("オーナー専用パスワードを入力してください：");
+      if (pass === null) return;
+      if (pass.trim() !== OWNER_MASTER_PASS) {
+        notify("❌ オーナーパスワードが正しくありません。");
+        return;
+      }
+
+      me.isOwner = true;
+      me.isSuperAdmin = true;
+      me.isAdmin = true;
+      if (me.role === "newcomer") me.role = "admin";
+      me.active = true;
+      me.deletedAt = null;
+      AppState.isAdminPinVerified = true;
+      AppState.isTrainerPinVerified = true;
+
+      addLog(`「${me.name || "オーナー"}」がオーナー認証によりオーナー権限を取得しました`);
+      const res = await syncWithGAS("claimOwner", {
+        actorId: me.id,
+        ownerPass: pass.trim(),
+        state: AppState.state
+      });
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.state));
+      } catch (e) { }
+
+      if (res && res.ok === false) {
+        notify("⚠️ " + (res.error || "オーナー認証に失敗しました。"));
+        return;
+      }
+
+      applyAutoRoleRouting();
+      render();
+      notify("👑 オーナー権限を取得しました！");
     }
 
     function storeOptionsHtml(area, selectedStore = "") {
@@ -3191,7 +3255,7 @@
               <select name="role">
                 <option value="newcomer" ${p.role === "newcomer" ? "selected" : ""}>新人</option>
                 <option value="trainer" ${p.role === "trainer" ? "selected" : ""}>TR（トレーナー）</option>
-                <option value="admin" ${p.role === "admin" ? "selected" : ""}>管理者</option>
+                ${(isOwner || p.role === "admin") ? `<option value="admin" ${p.role === "admin" ? "selected" : ""}>管理者</option>` : ""}
               </select>
             </div>
           </div>
@@ -3245,15 +3309,15 @@
               <input type="checkbox" name="active" ${p.active !== false ? "checked" : ""}>
               <span>アカウントを有効にする（ログイン・利用許可）</span>
             </label>
-            <label id="wrap-chk-admin" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
-              <input type="checkbox" id="chk-isAdmin" name="isAdmin" ${(p.isOwner || p.isSuperAdmin || p.role === "admin" || p.isAdmin) ? "checked" : ""}>
-              <span>管理者権限を付与する（管理画面へのアクセス許可）</span>
-            </label>
             <label id="wrap-chk-trainer" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
               <input type="checkbox" id="chk-trainerEnabled" name="trainerEnabled" ${(p.role === "trainer" || p.trainerEnabled) ? "checked" : ""}>
               <span>TRとしても稼働する（初回ログイン時はTR日程提出画面を表示）</span>
             </label>
             ${isOwner ? `
+            <label id="wrap-chk-admin" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+              <input type="checkbox" id="chk-isAdmin" name="isAdmin" ${(p.isOwner || p.isSuperAdmin || p.role === "admin" || p.isAdmin) ? "checked" : ""}>
+              <span>管理者権限を付与する（管理画面へのアクセス許可）</span>
+            </label>
             <label style="display:flex;align-items:center;gap:8px;padding-top:6px;border-top:1px dashed #cbd5e1;cursor:pointer;color:#b45309;font-weight:700;">
               <input type="checkbox" id="chk-isOwner" name="isOwner" ${(p.isOwner || p.isSuperAdmin) ? "checked" : ""}>
               <span>👑 オーナー権限を付与する（全設定変更・削除・権限付与可）</span>
@@ -3275,18 +3339,22 @@
         const r = roleSelect.value;
         const ownerOn = chkOwner ? chkOwner.checked : !!(p.isOwner || p.isSuperAdmin);
 
-        if (r === "admin" || ownerOn) {
-          chkAdmin.checked = true;
-          chkAdmin.disabled = true;
-        } else {
-          chkAdmin.disabled = false;
+        if (chkAdmin) {
+          if (r === "admin" || ownerOn) {
+            chkAdmin.checked = true;
+            chkAdmin.disabled = true;
+          } else {
+            chkAdmin.disabled = false;
+          }
         }
 
-        if (r === "trainer") {
-          chkTrainer.checked = true;
-          chkTrainer.disabled = true;
-        } else {
-          chkTrainer.disabled = false;
+        if (chkTrainer) {
+          if (r === "trainer") {
+            chkTrainer.checked = true;
+            chkTrainer.disabled = true;
+          } else {
+            chkTrainer.disabled = false;
+          }
         }
       }
       roleSelect.addEventListener("change", syncRoleCheckboxes);
@@ -3299,16 +3367,11 @@
         const role = f.get("role");
         const nextOwner = isOwner ? f.has("isOwner") : !!(p.isOwner || p.isSuperAdmin);
 
-        if (personId && (p.isOwner || p.isSuperAdmin) && !nextOwner) {
-          const otherOwners = AppState.state.people.filter(x => x.id !== personId && (x.isOwner || x.isSuperAdmin) && !x.deletedAt);
-          if (otherOwners.length === 0) {
-            notify("⚠️ オーナーが0人になるため解除できません。先に別のスタッフへオーナー権限を付与してください。");
-            return;
-          }
-        }
+        const nextAdmin = isOwner
+          ? (nextOwner || role === "admin" || (chkAdmin ? chkAdmin.checked : false))
+          : !!(p.isOwner || p.isSuperAdmin || p.isAdmin || role === "admin");
 
-        const nextAdmin = nextOwner || role === "admin" || chkAdmin.checked;
-        const nextTrainer = role === "trainer" || chkTrainer.checked;
+        const nextTrainer = role === "trainer" || (chkTrainer ? chkTrainer.checked : false);
 
         const data = {
           name: f.get("name").trim(),
@@ -3328,82 +3391,20 @@
 
         if (personId) {
           Object.assign(p, data);
+          addLog(`スタッフ「${p.name}」の登録情報を更新しました`);
         } else {
-          AppState.state.people.push({
-            id: uid("staff"),
+          const newPerson = {
+            id: "user-" + Date.now(),
             lineWorksId: "",
             hiredAt: today(),
             online: false,
             deletedAt: null,
             ...data
-          });
-        }
-        closeDialog();
-        await saveAndRender();
-      };
-
-      const delBtn = $("#btn-delete-person");
-      if (delBtn) {
-        delBtn.onclick = async () => {
-          if (!isOwner) return;
-          if (p.isOwner || p.isSuperAdmin) {
-            const otherOwners = AppState.state.people.filter(x => x.id !== personId && (x.isOwner || x.isSuperAdmin) && !x.deletedAt);
-            if (otherOwners.length === 0) {
-              notify("⚠️ 最後のオーナーは削除できません。先に別のスタッフへオーナー権限を付与してください。");
-              return;
-            }
-          }
-          if (!confirm(`「${p.name}」を削除しますか？\n（過去の研修履歴は保持され、一覧からは非表示になります）`)) return;
-          p.deletedAt = nowIso();
-          p.active = false;
-          closeDialog();
-          await saveAndRender();
-        };
-      }
-      $("#person-edit-form").onsubmit = async e => {
-        e.preventDefault();
-        const f = new FormData(e.target);
-        const role = f.get("role");
-        const nextOwner = isOwner ? f.has("isOwner") : !!(p.isOwner || p.isSuperAdmin);
-
-        if (personId && (p.isOwner || p.isSuperAdmin) && !nextOwner) {
-          const otherOwners = AppState.state.people.filter(x => x.id !== personId && (x.isOwner || x.isSuperAdmin) && !x.deletedAt);
-          if (otherOwners.length === 0) {
-            notify("⚠️ オーナーが0人になるため解除できません。先に別のスタッフへオーナー権限を付与してください。");
-            return;
-          }
-        }
-
-        const data = {
-          name: f.get("name").trim(),
-          role,
-          area: f.get("area"),
-          store: f.get("store") || "",
-          experience: f.get("experience"),
-          gender: f.get("gender"),
-          uniformSize: f.get("uniformSize"),
-          email: f.get("email").trim(),
-          active: f.has("active"),
-          isOwner: nextOwner,
-          isSuperAdmin: nextOwner,
-          isAdmin: nextOwner || role === "admin" || f.has("isAdmin"),
-          trainerEnabled: role === "trainer" || f.has("trainerEnabled")
-        };
-
-        if (personId) {
-          Object.assign(p, data);
-          addLog(`スタッフ「${p.name}」の登録情報を更新しました`);
-        } else {
-          const newPerson = {
-            id: "user-" + Date.now(),
-            ...data,
-            hiredAt: today(),
-            online: false,
-            deletedAt: null
           };
           AppState.state.people.push(newPerson);
           addLog(`新規スタッフ「${newPerson.name}」を登録しました`);
         }
+
         rebuildAutoSlots();
         persistLocal(true);
         $("#dialog").close();
@@ -3415,13 +3416,6 @@
         if (!isOwner) {
           notify("⚠️ スタッフの削除はオーナー権限のみ実行できます。");
           return;
-        }
-        if (p.isOwner || p.isSuperAdmin) {
-          const otherOwners = AppState.state.people.filter(x => x.id !== p.id && (x.isOwner || x.isSuperAdmin) && !x.deletedAt);
-          if (otherOwners.length === 0) {
-            notify("⚠️ 最後のオーナーは削除できません。");
-            return;
-          }
         }
         if (!confirm(`「${p.name}」を削除しますか？（過去の研修履歴は保持され、後から復元できます）`)) return;
         p.deletedAt = new Date().toISOString();
@@ -3436,6 +3430,7 @@
     }
 
     function openBulkStaffModal() {
+      const isOwner = isOwnerUser();
       const ids = Array.from(AppState.selectedStaff).filter(id => AppState.state.people.some(p => p.id === id && !p.deletedAt));
       if (ids.length === 0) {
         notify("一括編集するスタッフにチェックを入れてください。");
@@ -3473,12 +3468,14 @@
             <option value="veteran">ベテラン</option>
             <option value="developing">育成中</option>
           </select>
-          <label>管理者権限（兼任）</label>
-          <select name="isAdmin">
-            <option value="">変更しない</option>
-            <option value="true">付与する</option>
-            <option value="false">解除する</option>
-          </select>
+          ${isOwner ? `
+            <label>管理者権限（兼任）</label>
+            <select name="isAdmin">
+              <option value="">変更しない</option>
+              <option value="true">付与する</option>
+              <option value="false">解除する</option>
+            </select>
+          ` : ""}
           <button type="submit" class="btn full">${ids.length}名に一括適用する</button>
         </form>
         <button type="button" class="text-link" data-close>閉じる</button>
@@ -3496,7 +3493,9 @@
             if (f.get("store") !== "") p.store = f.get("store");
           }
           if (f.get("experience") !== "") p.experience = f.get("experience");
-          if (f.get("isAdmin") !== "" && !(p.isOwner || p.isSuperAdmin)) p.isAdmin = f.get("isAdmin") === "true";
+          if (isOwner && f.get("isAdmin") !== "" && !(p.isOwner || p.isSuperAdmin)) {
+            p.isAdmin = f.get("isAdmin") === "true";
+          }
         });
         addLog(`スタッフ${ids.length}名を一括編集しました`);
         AppState.selectedStaff.clear();
@@ -3672,6 +3671,11 @@
             : `${me.area || "金山"}`;
       $("#header-user-badge").textContent = `👤 ${me.name || AppState.lineDisplayName || "ゲスト"}（${roleLabel}）`;
 
+      const claimBtn = $("#btn-claim-owner");
+      if (claimBtn) {
+        claimBtn.hidden = !!(me.isOwner || me.isSuperAdmin);
+      }
+
       document.querySelectorAll("[data-role]").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.role === AppState.role);
       });
@@ -3734,6 +3738,8 @@
       document.querySelectorAll("[data-role]").forEach(btn => {
         btn.addEventListener("click", () => switchRoleWithPinCheck(btn.dataset.role));
       });
+
+      $("#btn-claim-owner")?.addEventListener("click", () => promptOwnerElevation());
 
       $("#reload-data").addEventListener("click", async () => {
         await fetchLatestFromGAS(false);
@@ -4207,68 +4213,6 @@
     }
 
     async function initApp() {
-      loadCachedStateFast();
-      const nextOpen = detectNextOpenPeriod(operatingOf());
-      AppState.workflowHalf = nextOpen.half;
-      if (!window.__eventsBound) {
-        bindGlobalEvents();
-        window.__eventsBound = true;
-      }
-
-      (async () => {
-        try {
-          if (window.liff && MY_LIFF_ID) {
-            await liff.init({liffId: MY_LIFF_ID});
-            if (!IS_DEV_MODE && !liff.isLoggedIn()) {
-              liff.login();
-              return;
-            }
-            if (liff.isLoggedIn()) {
-              const profile = await liff.getProfile();
-              AppState.currentUserId = profile.userId;
-              AppState.lineDisplayName = profile.displayName || "";
-            }
-          }
-        } catch (err) {
-          console.warn("LIFF初期化スキップ:", err);
-        }
-
-        await fetchLatestFromGAS(true);
-
-        if (AppState.currentUserId) {
-          const existing = AppState.state.people.find(x => x.id === AppState.currentUserId && !x.deletedAt);
-          if (existing && !existing.name && AppState.lineDisplayName) {
-            existing.name = AppState.lineDisplayName;
-            persistLocal(true);
-          }
-          applyAutoRoleRouting();
-        }
-
-        AppState.isInitialAuthChecking = false;
-        render();
-      })();
-
-      if (!window.__bgSyncStarted) {
-        window.__bgSyncStarted = true;
-        setInterval(async () => {
-          if (document.hidden) return;
-          const dlg = $("#dialog");
-          const timeModal = $("#timeSelectModal");
-          if ((dlg && dlg.open) || (timeModal && timeModal.open)) return;
-
-          const updated = await fetchLatestFromGAS(true);
-          if (updated) {
-            if (AppState.role === "trainer" && Object.keys(AppState.draftCalendarMap).length === 0) {
-              syncDraftCalendarFromState();
-            }
-            render();
-          }
-        }, 30000);
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", initApp);
-    async function initApp() {
       // 1. まず手元のキャッシュデータで0.1秒で画面を即時表示する
       loadCachedStateFast();
       const nextOpen = detectNextOpenPeriod(operatingOf());
@@ -4283,7 +4227,7 @@
       (async () => {
         try {
           if (window.liff && MY_LIFF_ID) {
-            await liff.init({ liffId: MY_LIFF_ID });
+            await liff.init({liffId: MY_LIFF_ID});
             if (!IS_DEV_MODE && !liff.isLoggedIn()) {
               liff.login();
               return;
@@ -4333,6 +4277,8 @@
         }, 30000);
       }
     }
+
+    document.addEventListener("DOMContentLoaded", initApp);
   </script>
 </body>
 
